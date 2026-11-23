@@ -4,6 +4,13 @@
 
 namespace SchedOS {
 
+static int calculateEffectivePriority(const Process& p, int currentTime, int agingInterval) {
+    if (agingInterval <= 0) return p.priority;
+    int waitTime = std::max(0, currentTime - p.arrivalTime);
+    int priorityBoost = waitTime / agingInterval;
+    return std::max(0, p.priority - priorityBoost);
+}
+
 void PriorityScheduling::schedule(std::vector<Process>& processes) {
     if (processes.empty()) return;
 
@@ -23,10 +30,11 @@ void PriorityScheduling::schedule(std::vector<Process>& processes) {
 
         for (int i = 0; i < n; ++i) {
             if (!completed[i] && processes[i].arrivalTime <= currentTime) {
-                if (processes[i].priority < bestPriority ||
-                    (processes[i].priority == bestPriority && bestIdx >= 0 &&
+                int effPrio = calculateEffectivePriority(processes[i], currentTime, agingInterval_);
+                if (effPrio < bestPriority ||
+                    (effPrio == bestPriority && bestIdx >= 0 &&
                      processes[i].arrivalTime < processes[bestIdx].arrivalTime)) {
-                    bestPriority = processes[i].priority;
+                    bestPriority = effPrio;
                     bestIdx = i;
                 }
             }
@@ -51,15 +59,16 @@ void PriorityScheduling::schedule(std::vector<Process>& processes) {
             contextSwitchCount_++;
             totalContextSwitchOverhead_ += contextSwitchCost_;
 
-            // Re-evaluate in case a higher-priority job arrived during context switch
+            // Re-evaluate in case a higher-priority or newly aged job qualified
             bestIdx = -1;
             bestPriority = INT_MAX;
             for (int i = 0; i < n; ++i) {
                 if (!completed[i] && processes[i].arrivalTime <= currentTime) {
-                    if (processes[i].priority < bestPriority ||
-                        (processes[i].priority == bestPriority && bestIdx >= 0 &&
+                    int effPrio = calculateEffectivePriority(processes[i], currentTime, agingInterval_);
+                    if (effPrio < bestPriority ||
+                        (effPrio == bestPriority && bestIdx >= 0 &&
                          processes[i].arrivalTime < processes[bestIdx].arrivalTime)) {
-                        bestPriority = processes[i].priority;
+                        bestPriority = effPrio;
                         bestIdx = i;
                     }
                 }

@@ -7,7 +7,7 @@
 
 namespace SchedOS {
 
-/// Computes and stores comprehensive scheduling and CPU performance metrics.
+/// Computes and stores comprehensive scheduling, CPU performance, and fairness metrics.
 struct SchedulingMetrics {
     // Standard OS process metrics
     double avgWaitingTime    = 0.0;
@@ -19,6 +19,12 @@ struct SchedulingMetrics {
     double productiveCpuUtilization  = 0.0;  // (Busy Time / Total Time) * 100
     double totalCpuOccupancy         = 0.0;  // ((Busy Time + CS Overhead) / Total Time) * 100
     double throughput                = 0.0;  // Processes per unit time
+
+    // Fairness & Waiting-Time Dispersion
+    int maxWaitingTime               = 0;
+    int minWaitingTime               = 0;
+    double waitingTimeVariance       = 0.0;
+    double waitingTimeStdDev         = 0.0;
 
     // Simulation timeline totals
     int totalSimulationDuration      = 0;

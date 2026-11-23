@@ -3,6 +3,8 @@
 #include <iomanip>
 #include <numeric>
 #include <algorithm>
+#include <cmath>
+#include <climits>
 
 namespace SchedOS {
 
@@ -19,15 +21,33 @@ SchedulingMetrics SchedulingMetrics::compute(const std::vector<Process>& process
     double totalTurnaround = 0.0;
     double totalResponse   = 0.0;
 
+    int minWT = INT_MAX;
+    int maxWT = INT_MIN;
+
     for (const auto& p : processes) {
         totalWaiting    += p.waitingTime;
         totalTurnaround += p.turnaroundTime;
         totalResponse   += p.responseTime;
+
+        minWT = std::min(minWT, p.waitingTime);
+        maxWT = std::max(maxWT, p.waitingTime);
     }
 
     m.avgWaitingTime    = totalWaiting / n;
     m.avgTurnaroundTime = totalTurnaround / n;
     m.avgResponseTime   = totalResponse / n;
+
+    m.minWaitingTime = (minWT == INT_MAX) ? 0 : minWT;
+    m.maxWaitingTime = (maxWT == INT_MIN) ? 0 : maxWT;
+
+    // Calculate Waiting-Time Variance and Standard Deviation
+    double varSum = 0.0;
+    for (const auto& p : processes) {
+        double diff = static_cast<double>(p.waitingTime) - m.avgWaitingTime;
+        varSum += diff * diff;
+    }
+    m.waitingTimeVariance = varSum / n;
+    m.waitingTimeStdDev   = std::sqrt(m.waitingTimeVariance);
 
     if (!gantt.empty()) {
         int minStart  = std::get<1>(gantt.front());
@@ -81,6 +101,13 @@ void SchedulingMetrics::print(std::ostream& out) const {
     out << "  Productive CPU Util.     : " << productiveCpuUtilization << "%\n";
     out << "  Total CPU Occupancy      : " << totalCpuOccupancy << "%\n";
     out << "  Throughput               : " << throughput         << " processes/unit time\n";
+    out << "  --------------------------------------------------\n";
+    out << "  Fairness & Dispersion Analysis:\n";
+    out << "    Minimum Waiting Time   : " << minWaitingTime << " time units\n";
+    out << "    Maximum Waiting Time   : " << maxWaitingTime << " time units\n";
+    out << "    Waiting-Time Variance  : " << waitingTimeVariance << "\n";
+    out << "    Waiting-Time Std. Dev. : " << waitingTimeStdDev << "\n";
+    out << "    (Note: Lower variance/std. dev. indicates more uniform waiting time distribution)\n";
     out << "\n";
 }
 
