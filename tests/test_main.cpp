@@ -17,6 +17,7 @@
 #include "schedos/CSVManager.h"
 #include "schedos/TaskQueue.h"
 #include "schedos/ThreadPool.h"
+#include "schedos/BenchmarkEngine.h"
 #include "schedos/FCFS.h"
 #include "schedos/SJF.h"
 #include "schedos/SRTF.h"
@@ -718,6 +719,26 @@ void testThreadPool() {
     }
 }
 
+void testBenchmarkEngine() {
+    // 1. Task determinism
+    uint64_t val1 = BenchmarkEngine::executeTask(42, 100);
+    uint64_t val2 = BenchmarkEngine::executeTask(42, 100);
+    ASSERT_EQ(val1, val2, "Benchmark task deterministic");
+
+    // 2. Run small benchmark
+    auto res = BenchmarkEngine::run(20, 2, 500, 1);
+    ASSERT_EQ(res.numTasks, static_cast<size_t>(20), "Benchmark task count matches");
+    ASSERT_EQ(res.resultsMatch, true, "Benchmark seq and par checksums match");
+    ASSERT_EQ(res.sequentialChecksum, res.parallelChecksum, "Benchmark checksum equality");
+    ASSERT_EQ(res.speedup > 0.0, true, "Benchmark positive speedup");
+
+    // 3. Print report check
+    std::ostringstream oss;
+    BenchmarkEngine::printReport(res, oss, false);
+    ASSERT_EQ(!oss.str().empty(), true, "Benchmark report non-empty");
+    ASSERT_EQ(oss.str().find("CONCURRENCY & MULTITHREADING PERFORMANCE BENCHMARK") != std::string::npos, true, "Benchmark header found");
+}
+
 int main() {
     std::cout << "\n========================================\n";
     std::cout <<   "   SchedOS — Scheduling Test Suite     \n";
@@ -794,6 +815,10 @@ int main() {
 
     runSection("ThreadPool Tests", [] {
         testThreadPool();
+    });
+
+    runSection("BenchmarkEngine Tests", [] {
+        testBenchmarkEngine();
     });
 
     std::cout << "\n========================================\n";
