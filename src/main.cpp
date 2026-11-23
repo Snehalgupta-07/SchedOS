@@ -12,6 +12,7 @@
 #include "schedos/RoundRobin.h"
 #include "schedos/PriorityScheduling.h"
 #include "schedos/Metrics.h"
+#include "schedos/CLI.h"
 
 using namespace SchedOS;
 
@@ -20,6 +21,8 @@ void printGanttChart(const std::vector<GanttEntry>& gantt, std::ostream& out = s
     for (const auto& [pid, start, end] : gantt) {
         if (pid == -1)
             out << "[IDLE:" << start << "-" << end << "] ";
+        else if (pid == -2)
+            out << "[CS:" << start << "-" << end << "] ";
         else
             out << "[P" << pid << ":" << start << "-" << end << "] ";
     }
@@ -28,25 +31,23 @@ void printGanttChart(const std::vector<GanttEntry>& gantt, std::ostream& out = s
 
 void printUsage(const char* progName) {
     std::cout << "\nSchedOS — CPU Scheduling and Process Management Simulator\n\n";
-    std::cout << "Usage: " << progName << " [options]\n\n";
+    std::cout << "Usage:\n";
+    std::cout << "  " << progName << "                  Launch interactive menu-driven CLI\n";
+    std::cout << "  " << progName << " [options]        Execute in batch mode\n\n";
     std::cout << "Options:\n";
-    std::cout << "  -f <file>       Input file with process data\n";
-    std::cout << "  -a <algorithm>  Algorithm: fcfs, sjf, srtf, rr, priority, all\n";
+    std::cout << "  -f <file>       Input file with process data (text or CSV)\n";
+    std::cout << "  -a <algorithm>  Algorithm: fcfs, sjf, srtf, rr, priority, all (default: all)\n";
     std::cout << "  -q <quantum>    Time quantum for Round Robin (default: 2)\n";
+    std::cout << "  -c <cost>       Context switch cost (default: 0)\n";
     std::cout << "  -h              Show this help message\n\n";
-    std::cout << "Input format (one process per line):\n";
-    std::cout << "  PID  ArrivalTime  BurstTime  Priority\n\n";
-    std::cout << "Example:\n";
-    std::cout << "  1 0 10 2\n";
-    std::cout << "  2 1 5  1\n";
-    std::cout << "  3 2 8  3\n\n";
 }
 
-void runAlgorithm(Scheduler& scheduler, std::vector<Process> processes) {
+void runAlgorithm(Scheduler& scheduler, std::vector<Process> processes, int csCost = 0) {
     std::cout << "\n========================================\n";
     std::cout << "  " << scheduler.name() << "\n";
     std::cout << "========================================\n";
 
+    scheduler.setContextSwitchCost(csCost);
     scheduler.schedule(processes);
 
     printProcessTable(processes, std::cout);
@@ -57,9 +58,17 @@ void runAlgorithm(Scheduler& scheduler, std::vector<Process> processes) {
 }
 
 int main(int argc, char* argv[]) {
+    // If no arguments, launch the interactive CLI
+    if (argc == 1) {
+        CLI cli;
+        cli.run();
+        return 0;
+    }
+
     std::string inputFile;
     std::string algorithm = "all";
     int quantum = 2;
+    int csCost = 0;
 
     for (int i = 1; i < argc; ++i) {
         std::string arg = argv[i];
@@ -69,7 +78,9 @@ int main(int argc, char* argv[]) {
             algorithm = argv[++i];
         } else if (arg == "-q" && i + 1 < argc) {
             quantum = std::atoi(argv[++i]);
-        } else if (arg == "-h") {
+        } else if (arg == "-c" && i + 1 < argc) {
+            csCost = std::atoi(argv[++i]);
+        } else if (arg == "-h" || arg == "--help") {
             printUsage(argv[0]);
             return 0;
         } else {
@@ -103,23 +114,23 @@ int main(int argc, char* argv[]) {
     auto run = [&](const std::string& alg) {
         if (alg == "fcfs" || alg == "all") {
             FCFS fcfs;
-            runAlgorithm(fcfs, processes);
+            runAlgorithm(fcfs, processes, csCost);
         }
         if (alg == "sjf" || alg == "all") {
             SJF sjf;
-            runAlgorithm(sjf, processes);
+            runAlgorithm(sjf, processes, csCost);
         }
         if (alg == "srtf" || alg == "all") {
             SRTF srtf;
-            runAlgorithm(srtf, processes);
+            runAlgorithm(srtf, processes, csCost);
         }
         if (alg == "rr" || alg == "all") {
             RoundRobin rr(quantum);
-            runAlgorithm(rr, processes);
+            runAlgorithm(rr, processes, csCost);
         }
         if (alg == "priority" || alg == "all") {
             PriorityScheduling ps;
-            runAlgorithm(ps, processes);
+            runAlgorithm(ps, processes, csCost);
         }
         if (alg != "fcfs" && alg != "sjf" && alg != "srtf" &&
             alg != "rr" && alg != "priority" && alg != "all") {

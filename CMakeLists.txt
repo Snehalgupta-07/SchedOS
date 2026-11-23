@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.14)
-project(SchedOS VERSION 1.0.0 LANGUAGES CXX)
+project(SchedOS VERSION 2.0.0 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -15,6 +15,7 @@ endif()
 # --- Core Library ---
 add_library(schedos_core
     src/Process.cpp
+    src/ProcessManager.cpp
     src/Scheduler.cpp
     src/FCFS.cpp
     src/SJF.cpp
@@ -22,6 +23,7 @@ add_library(schedos_core
     src/RoundRobin.cpp
     src/PriorityScheduling.cpp
     src/Metrics.cpp
+    src/CLI.cpp
 )
 target_include_directories(schedos_core PUBLIC ${CMAKE_SOURCE_DIR}/include)
 

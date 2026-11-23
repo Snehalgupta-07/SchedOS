@@ -9,6 +9,7 @@
 #include <functional>
 
 #include "schedos/Process.h"
+#include "schedos/ProcessManager.h"
 #include "schedos/FCFS.h"
 #include "schedos/SJF.h"
 #include "schedos/SRTF.h"
@@ -274,6 +275,44 @@ void testReadProcesses() {
     ASSERT_EQ(procs[2].priority, 3, "readProcesses P3 priority");
 }
 
+void testProcessManager() {
+    ProcessManager pm;
+    ASSERT_EQ(pm.empty(), true, "PM initially empty");
+    ASSERT_EQ(static_cast<int>(pm.size()), 0, "PM size 0");
+
+    pm.addProcess(Process(1, 0, 5, 2));
+    pm.addProcess(Process(2, 2, 4, 1));
+    ASSERT_EQ(static_cast<int>(pm.size()), 2, "PM size 2 after adds");
+    ASSERT_EQ(pm.hasPid(1), true, "PM has P1");
+    ASSERT_EQ(pm.hasPid(99), false, "PM does not have P99");
+
+    // Duplicate PID rejection
+    ASSERT_THROW(pm.addProcess(Process(1, 1, 3, 0)), std::invalid_argument, "PM reject duplicate PID");
+
+    // Edit process
+    bool edited = pm.editProcess(1, 0, 8, 3);
+    ASSERT_EQ(edited, true, "PM edit existing P1");
+    auto p1 = pm.findProcess(1);
+    ASSERT_EQ(p1.has_value(), true, "PM found P1");
+    ASSERT_EQ(p1->burstTime, 8, "PM P1 burst updated");
+
+    bool editNonexistent = pm.editProcess(99, 0, 5, 0);
+    ASSERT_EQ(editNonexistent, false, "PM edit nonexistent");
+
+    // Delete process
+    bool deleted = pm.deleteProcess(2);
+    ASSERT_EQ(deleted, true, "PM delete P2");
+    ASSERT_EQ(static_cast<int>(pm.size()), 1, "PM size 1 after delete");
+    ASSERT_EQ(pm.hasPid(2), false, "PM P2 deleted");
+
+    bool deleteNonexistent = pm.deleteProcess(99);
+    ASSERT_EQ(deleteNonexistent, false, "PM delete nonexistent");
+
+    // Clear
+    pm.clear();
+    ASSERT_EQ(pm.empty(), true, "PM empty after clear");
+}
+
 int main() {
     std::cout << "\n========================================\n";
     std::cout <<   "   SchedOS — Scheduling Test Suite     \n";
@@ -317,6 +356,10 @@ int main() {
         testInvalidProcess();
         testEmptySchedule();
         testReadProcesses();
+    });
+
+    runSection("ProcessManager Tests", [] {
+        testProcessManager();
     });
 
     std::cout << "\n========================================\n";
