@@ -1,0 +1,93 @@
+﻿
+========================================================
+  SchedOS — CPU Scheduling & Process Management Simulator
+========================================================
+  Active Algorithm: fcfs | RR Quantum: 2 | CS Overhead: 0 | Processes: 0
+--------------------------------------------------------
+  1. Add a new process
+  2. View all processes
+  3. Edit an existing process
+  4. Delete a process
+  5. Select a scheduling algorithm
+  6. Execute scheduling simulation
+  7. Compare all scheduling algorithms
+  8. Load processes from CSV
+  9. Export results to CSV
+  10. Reset simulation
+  11. Concurrency & Multithreading Benchmarking Suite
+  12. Exit
+--------------------------------------------------------
+  Enter your choice (1-12): 
+========================================================
+  Load Processes from CSV
+========================================================
+  Expected CSV format: PID,ArrivalTime,BurstTime,Priority
+  Enter CSV file path:   [+] Successfully loaded 5 processes from CSV.
+
+========================================================
+  Current Process Table
+========================================================
+PID     Arrival Time  Burst Time  Priority  
+--------------------------------------------
+P1      0             8           2         
+P2      1             4           1         
+P3      2             9           3         
+P4      3             5           4         
+P5      4             2           0         
+
+  Total processes: 5
+
+========================================================
+  SchedOS — CPU Scheduling & Process Management Simulator
+========================================================
+  Active Algorithm: fcfs | RR Quantum: 2 | CS Overhead: 0 | Processes: 5
+--------------------------------------------------------
+  1. Add a new process
+  2. View all processes
+  3. Edit an existing process
+  4. Delete a process
+  5. Select a scheduling algorithm
+  6. Execute scheduling simulation
+  7. Compare all scheduling algorithms
+  8. Load processes from CSV
+  9. Export results to CSV
+  10. Reset simulation
+  11. Concurrency & Multithreading Benchmarking Suite
+  12. Exit
+--------------------------------------------------------
+  Enter your choice (1-12): 
+========================================================
+  Current Process Table
+========================================================
+PID     Arrival Time  Burst Time  Priority  
+--------------------------------------------
+P1      0             8           2         
+P2      1             4           1         
+P3      2             9           3         
+P4      3             5           4         
+P5      4             2           0         
+
+  Total processes: 5
+
+========================================================
+  SchedOS — CPU Scheduling & Process Management Simulator
+========================================================
+  Active Algorithm: fcfs | RR Quantum: 2 | CS Overhead: 0 | Processes: 5
+--------------------------------------------------------
+  1. Add a new process
+  2. View all processes
+  3. Edit an existing process
+  4. Delete a process
+  5. Select a scheduling algorithm
+  6. Execute scheduling simulation
+  7. Compare all scheduling algorithms
+  8. Load processes from CSV
+  9. Export results to CSV
+  10. Reset simulation
+  11. Concurrency & Multithreading Benchmarking Suite
+  12. Exit
+--------------------------------------------------------
+  Enter your choice (1-12): 
+  Thank you for using SchedOS. Goodbye!
+
+

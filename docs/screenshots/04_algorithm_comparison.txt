@@ -1,0 +1,122 @@
+﻿
+========================================================
+  SchedOS — CPU Scheduling & Process Management Simulator
+========================================================
+  Active Algorithm: fcfs | RR Quantum: 2 | CS Overhead: 0 | Processes: 0
+--------------------------------------------------------
+  1. Add a new process
+  2. View all processes
+  3. Edit an existing process
+  4. Delete a process
+  5. Select a scheduling algorithm
+  6. Execute scheduling simulation
+  7. Compare all scheduling algorithms
+  8. Load processes from CSV
+  9. Export results to CSV
+  10. Reset simulation
+  11. Concurrency & Multithreading Benchmarking Suite
+  12. Exit
+--------------------------------------------------------
+  Enter your choice (1-12): 
+========================================================
+  Load Processes from CSV
+========================================================
+  Expected CSV format: PID,ArrivalTime,BurstTime,Priority
+  Enter CSV file path:   [+] Successfully loaded 5 processes from CSV.
+
+========================================================
+  Current Process Table
+========================================================
+PID     Arrival Time  Burst Time  Priority  
+--------------------------------------------
+P1      0             8           2         
+P2      1             4           1         
+P3      2             9           3         
+P4      3             5           4         
+P5      4             2           0         
+
+  Total processes: 5
+
+========================================================
+  SchedOS — CPU Scheduling & Process Management Simulator
+========================================================
+  Active Algorithm: fcfs | RR Quantum: 2 | CS Overhead: 0 | Processes: 5
+--------------------------------------------------------
+  1. Add a new process
+  2. View all processes
+  3. Edit an existing process
+  4. Delete a process
+  5. Select a scheduling algorithm
+  6. Execute scheduling simulation
+  7. Compare all scheduling algorithms
+  8. Load processes from CSV
+  9. Export results to CSV
+  10. Reset simulation
+  11. Concurrency & Multithreading Benchmarking Suite
+  12. Exit
+--------------------------------------------------------
+  Enter your choice (1-12): 
+========================================================
+  Compare All Scheduling Algorithms
+========================================================
+
+====================================================================================================
+                             ALGORITHM PERFORMANCE COMPARISON BENCHMARK                             
+====================================================================================================
+Algorithm                             Avg WT    Avg TAT   Avg RT    Prod. CPU(%)  Throughput    CS Count  Total Time
+----------------------------------------------------------------------------------------------------------
+First Come First Serve (FCFS)         11.40     17.00     11.40     100.0%*       0.1785*       0*        28*       
+Shortest Job First (SJF)              8.20      13.80     8.20      100.0%*       0.1785*       0*        28*       
+Shortest Remaining Time First (SRTF)  6.600*    12.20*    4.40      100.0%*       0.1785*       0*        28*       
+Round Robin (RR)                      13.00     18.60     2.800*    100.0%*       0.1785*       0*        28*       
+Priority Scheduling (Non-Preemptive)  9.00      14.60     9.00      100.0%*       0.1785*       0*        28*       
+----------------------------------------------------------------------------------------------------
+  * Indicates best performance for that metric.
+
+=== Architectural Trade-off Analysis (Operating System Principles) ===
+1. First-Come, First-Served (FCFS):
+   - Pros: Minimal scheduling overhead (0 preemption); starvation-free.
+   - Cons: Susceptible to Convoy Effect; higher average turnaround time when long bursts arrive early.
+
+2. Shortest Job First (SJF - Non-Preemptive):
+   - Pros: Mathematically provable minimum average waiting time for static batch arrivals.
+   - Cons: Potential starvation for long-running jobs; requires burst-time knowledge.
+
+3. Shortest Remaining Time First (SRTF - Preemptive):
+   - Pros: Highly responsive to newly arrived short bursts; reduces average turnaround time dynamically.
+   - Cons: High context-switching overhead under frequent arrivals; risk of starvation.
+
+4. Round Robin (RR - Preemptive):
+   - Pros: Optimal for interactive time-sharing systems; guaranteed bounded response time.
+   - Cons: Overhead highly sensitive to quantum size 'q' (too small = excessive CS, too large = degrades to FCFS).
+
+5. Priority Scheduling (Non-Preemptive):
+   - Pros: Directly aligns CPU allocation with real-world task criticalities.
+   - Cons: Lower-priority jobs face indefinite postponement (requires aging techniques in production).
+
+Summary: No single scheduling algorithm is universally superior. Production OS kernels
+(e.g., Linux CFS or Siemens industrial RTOS) combine these strategies into multi-level priority queues.
+
+
+========================================================
+  SchedOS — CPU Scheduling & Process Management Simulator
+========================================================
+  Active Algorithm: fcfs | RR Quantum: 2 | CS Overhead: 0 | Processes: 5
+--------------------------------------------------------
+  1. Add a new process
+  2. View all processes
+  3. Edit an existing process
+  4. Delete a process
+  5. Select a scheduling algorithm
+  6. Execute scheduling simulation
+  7. Compare all scheduling algorithms
+  8. Load processes from CSV
+  9. Export results to CSV
+  10. Reset simulation
+  11. Concurrency & Multithreading Benchmarking Suite
+  12. Exit
+--------------------------------------------------------
+  Enter your choice (1-12): 
+  Thank you for using SchedOS. Goodbye!
+
+

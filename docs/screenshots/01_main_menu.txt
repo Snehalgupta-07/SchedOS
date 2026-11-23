@@ -1,0 +1,23 @@
+﻿
+========================================================
+  SchedOS — CPU Scheduling & Process Management Simulator
+========================================================
+  Active Algorithm: fcfs | RR Quantum: 2 | CS Overhead: 0 | Processes: 0
+--------------------------------------------------------
+  1. Add a new process
+  2. View all processes
+  3. Edit an existing process
+  4. Delete a process
+  5. Select a scheduling algorithm
+  6. Execute scheduling simulation
+  7. Compare all scheduling algorithms
+  8. Load processes from CSV
+  9. Export results to CSV
+  10. Reset simulation
+  11. Concurrency & Multithreading Benchmarking Suite
+  12. Exit
+--------------------------------------------------------
+  Enter your choice (1-12): 
+  Thank you for using SchedOS. Goodbye!
+
+

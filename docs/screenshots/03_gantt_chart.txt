@@ -1,0 +1,64 @@
+﻿
+Loaded 5 process(es).
+
+========================================
+  Round Robin (RR)
+========================================
+
+PID   Arrival   Burst   Priority  Completion  Turnaround  Waiting   Response  
+------------------------------------------------------------------------------
+1     0         8       2         35          35          27        0         
+2     1         4       1         20          19          15        2         
+3     2         9       3         41          39          30        4         
+4     3         5       4         37          34          29        9         
+5     4         2       0         17          13          11        11        
+
+
+=== Gantt Chart Visualization ===
+
+  +------+----+------+----+------+----+------+----+------+----+------+----+
+  |  P1  | CS |  P2  | CS |  P3  | CS |  P1  | CS |  P4  | CS |  P5  | CS |
+  +------+----+------+----+------+----+------+----+------+----+------+----+
+  0      2    3      5    6      8    9      11   12     14   15     17   18
+
+  +------+----+------+----+------+----+------+----+------+----+------+----+----+
+  |  P2  | CS |  P3  | CS |  P1  | CS |  P4  | CS |  P3  | CS |  P1  | CS | P4 |
+  +------+----+------+----+------+----+------+----+------+----+------+----+----+
+  18     20   21     23   24     26   27     29   30     32   33     35   36   37
+
+  +----+--------+
+  | CS |   P3   |
+  +----+--------+
+  37   38       41
+
+  Timeline: P1 [0-2] -> CS [2-3] -> P2 [3-5] -> CS [5-6] -> P3 [6-8] -> CS [8-9] -> P1 [9-11] -> CS [11-12] -> P4 [12-14] -> CS [14-15] -> P5 [15-17] -> CS [17-18] -> P2 [18-20] -> CS [20-21] -> P3 [21-23] -> CS [23-24] -> P1 [24-26] -> CS [26-27] -> P4 [27-29] -> CS [29-30] -> P3 [30-32] -> CS [32-33] -> P1 [33-35] -> CS [35-36] -> P4 [36-37] -> CS [37-38] -> P3 [38-41]
+
+  Execution Slices per Process:
+    P1: [0 -> 2], [9 -> 11], [24 -> 26], [33 -> 35] (Active Time: 8, Slices: 4, Preemptions: 3)
+    P2: [3 -> 5], [18 -> 20] (Active Time: 4, Slices: 2, Preemptions: 1)
+    P3: [6 -> 8], [21 -> 23], [30 -> 32], [38 -> 41] (Active Time: 9, Slices: 4, Preemptions: 3)
+    P4: [12 -> 14], [27 -> 29], [36 -> 37] (Active Time: 5, Slices: 3, Preemptions: 2)
+    P5: [15 -> 17] (Active Time: 2, Slices: 1)
+    Context Switching: Total Overhead = 13 units
+
+
+=== Comprehensive Scheduling & CPU Metrics ===
+  Total Simulation Time    : 41 time units
+  Total CPU Busy Time      : 28 time units
+  Total CPU Idle Time      : 0 time units
+  Context-Switch Overhead  : 13 time units (13 switches)
+  --------------------------------------------------
+  Average Waiting Time     : 22.40
+  Average Turnaround Time  : 28.00
+  Average Response Time    : 5.20
+  Productive CPU Util.     : 68.29%
+  Total CPU Occupancy      : 100.00%
+  Throughput               : 0.12 processes/unit time
+  --------------------------------------------------
+  Fairness & Dispersion Analysis:
+    Minimum Waiting Time   : 11 time units
+    Maximum Waiting Time   : 30 time units
+    Waiting-Time Variance  : 61.44
+    Waiting-Time Std. Dev. : 7.84
+    (Note: Lower variance/std. dev. indicates more uniform waiting time distribution)
+
