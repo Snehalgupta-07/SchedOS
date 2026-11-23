@@ -897,6 +897,194 @@ void testThreadPoolStress() {
     ASSERT_EQ(completedTasks.load(), totalTasks, "TP stress atomic counter matches total");
 }
 
+void testIndependent_FCFS_ContextSwitchIdle() {
+    // Independently calculated:
+    // P1: arr 1, burst 3 -> CT 4, WT 0, TAT 3, RT 0
+    // P2: arr 2, burst 2 -> CT 7, WT 3, TAT 5, RT 3 (starts after CS at t=4..5)
+    // P3: arr 8, burst 4 -> CT 12, WT 0, TAT 4, RT 0 (starts after idle at t=7..8)
+    std::vector<Process> procs = {
+        Process(1, 1, 3),
+        Process(2, 2, 2),
+        Process(3, 8, 4)
+    };
+    FCFS fcfs;
+    fcfs.setContextSwitchCost(1);
+    fcfs.schedule(procs);
+
+    ASSERT_EQ(procs[0].completionTime, 4,  "Indep FCFS P1 CT");
+    ASSERT_EQ(procs[0].waitingTime,    0,  "Indep FCFS P1 WT");
+    ASSERT_EQ(procs[0].turnaroundTime, 3,  "Indep FCFS P1 TAT");
+    ASSERT_EQ(procs[0].responseTime,   0,  "Indep FCFS P1 RT");
+
+    ASSERT_EQ(procs[1].completionTime, 7,  "Indep FCFS P2 CT");
+    ASSERT_EQ(procs[1].waitingTime,    3,  "Indep FCFS P2 WT");
+    ASSERT_EQ(procs[1].turnaroundTime, 5,  "Indep FCFS P2 TAT");
+    ASSERT_EQ(procs[1].responseTime,   3,  "Indep FCFS P2 RT");
+
+    ASSERT_EQ(procs[2].completionTime, 12, "Indep FCFS P3 CT");
+    ASSERT_EQ(procs[2].waitingTime,    0,  "Indep FCFS P3 WT");
+    ASSERT_EQ(procs[2].turnaroundTime, 4,  "Indep FCFS P3 TAT");
+    ASSERT_EQ(procs[2].responseTime,   0,  "Indep FCFS P3 RT");
+
+    ASSERT_EQ(fcfs.contextSwitchCount(), 1, "Indep FCFS CS count");
+    ASSERT_EQ(fcfs.totalContextSwitchOverhead(), 1, "Indep FCFS CS overhead");
+
+    auto m = SchedulingMetrics::compute(procs, fcfs.ganttChart(), 1, 1);
+    ASSERT_NEAR(m.avgWaitingTime, 1.0, 0.001, "Indep FCFS avg WT");
+    ASSERT_NEAR(m.avgTurnaroundTime, 4.0, 0.001, "Indep FCFS avg TAT");
+    ASSERT_NEAR(m.productiveCpuUtilization, 75.0, 0.01, "Indep FCFS prod CPU");
+    ASSERT_NEAR(m.totalCpuOccupancy, (10.0 / 12.0) * 100.0, 0.01, "Indep FCFS total occupancy");
+}
+
+void testIndependent_SJF_SimultaneousCS() {
+    // Independently calculated:
+    // P1: arr 0, burst 5
+    // P2: arr 0, burst 2
+    // P3: arr 0, burst 4
+    // CS = 1
+    // Order: P2 [0..2] -> CS [2..3] -> P3 [3..7] -> CS [7..8] -> P1 [8..13]
+    std::vector<Process> procs = {
+        Process(1, 0, 5),
+        Process(2, 0, 2),
+        Process(3, 0, 4)
+    };
+    SJF sjf;
+    sjf.setContextSwitchCost(1);
+    sjf.schedule(procs);
+
+    ASSERT_EQ(procs[1].completionTime, 2,  "Indep SJF P2 CT");
+    ASSERT_EQ(procs[1].waitingTime,    0,  "Indep SJF P2 WT");
+    ASSERT_EQ(procs[1].responseTime,   0,  "Indep SJF P2 RT");
+
+    ASSERT_EQ(procs[2].completionTime, 7,  "Indep SJF P3 CT");
+    ASSERT_EQ(procs[2].waitingTime,    3,  "Indep SJF P3 WT");
+    ASSERT_EQ(procs[2].responseTime,   3,  "Indep SJF P3 RT");
+
+    ASSERT_EQ(procs[0].completionTime, 13, "Indep SJF P1 CT");
+    ASSERT_EQ(procs[0].waitingTime,    8,  "Indep SJF P1 WT");
+    ASSERT_EQ(procs[0].responseTime,   8,  "Indep SJF P1 RT");
+
+    ASSERT_EQ(sjf.contextSwitchCount(), 2, "Indep SJF CS count");
+    ASSERT_EQ(sjf.totalContextSwitchOverhead(), 2, "Indep SJF CS overhead");
+
+    auto m = SchedulingMetrics::compute(procs, sjf.ganttChart(), 2, 2);
+    ASSERT_NEAR(m.avgWaitingTime, 11.0 / 3.0, 0.01, "Indep SJF avg WT");
+    ASSERT_NEAR(m.avgTurnaroundTime, 22.0 / 3.0, 0.01, "Indep SJF avg TAT");
+    ASSERT_NEAR(m.productiveCpuUtilization, (11.0 / 13.0) * 100.0, 0.01, "Indep SJF prod CPU");
+    ASSERT_NEAR(m.totalCpuOccupancy, 100.0, 0.01, "Indep SJF total occupancy");
+}
+
+void testIndependent_SRTF_MultiPreemption() {
+    // Independently calculated:
+    // P1: arr 0, burst 8
+    // P2: arr 1, burst 4
+    // P3: arr 2, burst 2
+    // P4: arr 3, burst 1
+    // CS = 0
+    // Execution: P1 [0..1] -> P2 [1..2] -> P3 [2..4] -> P4 [4..5] -> P2 [5..8] -> P1 [8..15]
+    std::vector<Process> procs = {
+        Process(1, 0, 8),
+        Process(2, 1, 4),
+        Process(3, 2, 2),
+        Process(4, 3, 1)
+    };
+    SRTF srtf;
+    srtf.schedule(procs);
+
+    ASSERT_EQ(procs[2].completionTime, 4,  "Indep SRTF P3 CT");
+    ASSERT_EQ(procs[2].waitingTime,    0,  "Indep SRTF P3 WT");
+    ASSERT_EQ(procs[2].responseTime,   0,  "Indep SRTF P3 RT");
+
+    ASSERT_EQ(procs[3].completionTime, 5,  "Indep SRTF P4 CT");
+    ASSERT_EQ(procs[3].waitingTime,    1,  "Indep SRTF P4 WT");
+    ASSERT_EQ(procs[3].responseTime,   1,  "Indep SRTF P4 RT");
+
+    ASSERT_EQ(procs[1].completionTime, 8,  "Indep SRTF P2 CT");
+    ASSERT_EQ(procs[1].waitingTime,    3,  "Indep SRTF P2 WT");
+    ASSERT_EQ(procs[1].responseTime,   0,  "Indep SRTF P2 RT");
+
+    ASSERT_EQ(procs[0].completionTime, 15, "Indep SRTF P1 CT");
+    ASSERT_EQ(procs[0].waitingTime,    7,  "Indep SRTF P1 WT");
+    ASSERT_EQ(procs[0].responseTime,   0,  "Indep SRTF P1 RT");
+
+    auto m = SchedulingMetrics::compute(procs, srtf.ganttChart());
+    ASSERT_NEAR(m.avgWaitingTime, 2.75, 0.001, "Indep SRTF avg WT");
+    ASSERT_NEAR(m.avgTurnaroundTime, 6.50, 0.001, "Indep SRTF avg TAT");
+    ASSERT_NEAR(m.avgResponseTime, 0.25, 0.001, "Indep SRTF avg RT");
+}
+
+void testIndependent_RR_PreemptionCS() {
+    // Independently calculated:
+    // P1: arr 0, burst 5
+    // P2: arr 1, burst 3
+    // Quantum = 2, CS = 1
+    // Timeline: P1[0..2] -> CS[2..3] -> P2[3..5] -> CS[5..6] -> P1[6..8] -> CS[8..9] -> P2[9..10] -> CS[10..11] -> P1[11..12]
+    std::vector<Process> procs = {
+        Process(1, 0, 5),
+        Process(2, 1, 3)
+    };
+    RoundRobin rr(2);
+    rr.setContextSwitchCost(1);
+    rr.schedule(procs);
+
+    ASSERT_EQ(procs[1].completionTime, 10, "Indep RR P2 CT");
+    ASSERT_EQ(procs[1].turnaroundTime, 9,  "Indep RR P2 TAT");
+    ASSERT_EQ(procs[1].waitingTime,    6,  "Indep RR P2 WT");
+    ASSERT_EQ(procs[1].responseTime,   2,  "Indep RR P2 RT");
+
+    ASSERT_EQ(procs[0].completionTime, 12, "Indep RR P1 CT");
+    ASSERT_EQ(procs[0].turnaroundTime, 12, "Indep RR P1 TAT");
+    ASSERT_EQ(procs[0].waitingTime,    7,  "Indep RR P1 WT");
+    ASSERT_EQ(procs[0].responseTime,   0,  "Indep RR P1 RT");
+
+    ASSERT_EQ(rr.contextSwitchCount(), 4, "Indep RR CS count");
+    ASSERT_EQ(rr.totalContextSwitchOverhead(), 4, "Indep RR CS overhead");
+
+    auto m = SchedulingMetrics::compute(procs, rr.ganttChart(), 4, 4);
+    ASSERT_NEAR(m.productiveCpuUtilization, (8.0 / 12.0) * 100.0, 0.01, "Indep RR prod CPU");
+    ASSERT_NEAR(m.totalCpuOccupancy, 100.0, 0.01, "Indep RR total occupancy");
+}
+
+void testIndependent_Priority_AgingStarvation() {
+    // Independently calculated:
+    // P1: arr 0, burst 8, prio 1
+    // P2: arr 1, burst 2, prio 5
+    // P3: arr 7, burst 2, prio 2
+    // CS = 0
+    // Without aging: at t=8, P3(prio 2) precedes P2(prio 5). P3 CT=10, P2 CT=12.
+    // With aging (interval=2): at t=8, P2 effective prio = max(0, 5 - 7/2) = 2.
+    // P3 effective prio = max(0, 2 - 1/2) = 2. Tie break by arrival: P2 arr 1 vs P3 arr 7 -> P2 runs first!
+    // P2 CT=10, P3 CT=12.
+    {
+        std::vector<Process> procs = {
+            Process(1, 0, 8, 1),
+            Process(2, 1, 2, 5),
+            Process(3, 7, 2, 2)
+        };
+        PriorityScheduling ps;
+        ps.setAgingInterval(0);
+        ps.schedule(procs);
+
+        ASSERT_EQ(procs[0].completionTime, 8,  "Indep Prio NoAging P1 CT");
+        ASSERT_EQ(procs[2].completionTime, 10, "Indep Prio NoAging P3 CT (earlier)");
+        ASSERT_EQ(procs[1].completionTime, 12, "Indep Prio NoAging P2 CT (later)");
+    }
+    {
+        std::vector<Process> procs = {
+            Process(1, 0, 8, 1),
+            Process(2, 1, 2, 5),
+            Process(3, 7, 2, 2)
+        };
+        PriorityScheduling ps;
+        ps.setAgingInterval(2);
+        ps.schedule(procs);
+
+        ASSERT_EQ(procs[0].completionTime, 8,  "Indep Prio Aging P1 CT");
+        ASSERT_EQ(procs[1].completionTime, 10, "Indep Prio Aging P2 CT (promoted by aging)");
+        ASSERT_EQ(procs[2].completionTime, 12, "Indep Prio Aging P3 CT (runs after aged P2)");
+    }
+}
+
 int main() {
     std::cout << "\n========================================\n";
     std::cout <<   "   SchedOS — Scheduling Test Suite     \n";
@@ -987,6 +1175,14 @@ int main() {
     runSection("Stress & Concurrency Scale Tests", [] {
         testStressWorkloads();
         testThreadPoolStress();
+    });
+
+    runSection("Independent Algorithm Verification Tests", [] {
+        testIndependent_FCFS_ContextSwitchIdle();
+        testIndependent_SJF_SimultaneousCS();
+        testIndependent_SRTF_MultiPreemption();
+        testIndependent_RR_PreemptionCS();
+        testIndependent_Priority_AgingStarvation();
     });
 
     std::cout << "\n========================================\n";
