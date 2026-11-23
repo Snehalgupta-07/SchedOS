@@ -1,0 +1,5 @@
+# Processes with gaps (CPU idle periods between arrivals)
+# Format: PID  ArrivalTime  BurstTime  Priority
+1 0  3 1
+2 10 4 2
+3 20 2 0
