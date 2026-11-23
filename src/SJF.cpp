@@ -43,14 +43,28 @@ void SJF::schedule(std::vector<Process>& processes) {
             continue;
         }
 
-        auto& p = processes[bestIdx];
-
-        if (prevPid >= 0 && prevPid != p.pid && contextSwitchCost_ > 0) {
+        // If switching from another process, charge context switch
+        if (prevPid >= 0 && prevPid != processes[bestIdx].pid && contextSwitchCost_ > 0) {
             gantt_.emplace_back(-2, currentTime, currentTime + contextSwitchCost_);
             currentTime += contextSwitchCost_;
             contextSwitchCount_++;
             totalContextSwitchOverhead_ += contextSwitchCost_;
+
+            // Re-evaluate in case a shorter job arrived during the context switch
+            bestIdx = -1;
+            bestBurst = INT_MAX;
+            for (int i = 0; i < n; ++i) {
+                if (!completed[i] && processes[i].arrivalTime <= currentTime) {
+                    if (processes[i].burstTime < bestBurst ||
+                        (processes[i].burstTime == bestBurst && processes[i].arrivalTime < processes[bestIdx].arrivalTime)) {
+                        bestBurst = processes[i].burstTime;
+                        bestIdx = i;
+                    }
+                }
+            }
         }
+
+        auto& p = processes[bestIdx];
 
         p.responseTime = currentTime - p.arrivalTime;
 

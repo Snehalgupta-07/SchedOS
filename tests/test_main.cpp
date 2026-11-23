@@ -511,6 +511,76 @@ void testCSVManager() {
     }
 }
 
+void testRepeatedSimulations() {
+    auto procs = makeStandard3();
+    FCFS fcfs;
+    fcfs.schedule(procs);
+
+    int ct1 = procs[0].completionTime;
+    int ct2 = procs[1].completionTime;
+    int ct3 = procs[2].completionTime;
+
+    // Run a second time
+    fcfs.schedule(procs);
+    ASSERT_EQ(procs[0].completionTime, ct1, "Repeated simulation P1 CT identical");
+    ASSERT_EQ(procs[1].completionTime, ct2, "Repeated simulation P2 CT identical");
+    ASSERT_EQ(procs[2].completionTime, ct3, "Repeated simulation P3 CT identical");
+
+    // Run third time with RoundRobin
+    RoundRobin rr(2);
+    rr.schedule(procs);
+    int rrCt1 = procs[0].completionTime;
+    rr.schedule(procs);
+    ASSERT_EQ(procs[0].completionTime, rrCt1, "Repeated RR simulation P1 CT identical");
+}
+
+void testContextSwitchOrderChange() {
+    // Scenario:
+    // P1 arrives at 0, burst = 2
+    // P2 arrives at 1, burst = 5
+    // P3 arrives at 3, burst = 1
+    //
+    // WITHOUT context switch (CS=0):
+    // t=0-2: P1 runs, finishes at 2.
+    // At t=2: Only P2 has arrived. In SJF, P2 is the only option, so P2 runs t=2 to 7.
+    // At t=7: P3 runs, finishes at 8.
+    // Order: P1 (CT=2), P2 (CT=7), P3 (CT=8).
+    std::vector<Process> procsNoCS = {
+        Process(1, 0, 2),
+        Process(2, 1, 5),
+        Process(3, 3, 1)
+    };
+    SJF sjfNoCS;
+    sjfNoCS.setContextSwitchCost(0);
+    sjfNoCS.schedule(procsNoCS);
+    ASSERT_EQ(procsNoCS[0].completionTime, 2, "No-CS P1 CT");
+    ASSERT_EQ(procsNoCS[1].completionTime, 7, "No-CS P2 CT");
+    ASSERT_EQ(procsNoCS[2].completionTime, 8, "No-CS P3 CT");
+
+    // WITH context switch (CS=2):
+    // t=0-2: P1 runs, finishes at 2.
+    // t=2-4: Context switch interval [2-4].
+    // At t=3: P3 arrives!
+    // At t=4: Context switch completes. Candidates: P2 (burst=5) and P3 (burst=1).
+    // SJF chooses P3 because burst 1 < 5!
+    // t=4-5: P3 runs, finishes at 5!
+    // t=5-7: Context switch to P2 [5-7].
+    // t=7-12: P2 runs, finishes at 12!
+    // Execution order changed from P1->P2->P3 to P1->P3->P2!
+    std::vector<Process> procsWithCS = {
+        Process(1, 0, 2),
+        Process(2, 1, 5),
+        Process(3, 3, 1)
+    };
+    SJF sjfWithCS;
+    sjfWithCS.setContextSwitchCost(2);
+    sjfWithCS.schedule(procsWithCS);
+    ASSERT_EQ(procsWithCS[0].completionTime, 2, "With-CS P1 CT");
+    ASSERT_EQ(procsWithCS[2].completionTime, 5, "With-CS P3 runs BEFORE P2 and finishes at 5");
+    ASSERT_EQ(procsWithCS[1].completionTime, 12, "With-CS P2 finishes last at 12");
+    ASSERT_EQ(sjfWithCS.contextSwitchCount(), 2, "With-CS 2 context switches charged");
+}
+
 int main() {
     std::cout << "\n========================================\n";
     std::cout <<   "   SchedOS — Scheduling Test Suite     \n";
@@ -574,6 +644,11 @@ int main() {
 
     runSection("CSVManager Tests", [] {
         testCSVManager();
+    });
+
+    runSection("Advanced Verification Tests", [] {
+        testRepeatedSimulations();
+        testContextSwitchOrderChange();
     });
 
     std::cout << "\n========================================\n";

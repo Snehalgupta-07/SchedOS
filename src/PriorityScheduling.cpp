@@ -44,14 +44,29 @@ void PriorityScheduling::schedule(std::vector<Process>& processes) {
             continue;
         }
 
-        auto& p = processes[bestIdx];
-
-        if (prevPid >= 0 && prevPid != p.pid && contextSwitchCost_ > 0) {
+        // If switching from another process, charge context switch
+        if (prevPid >= 0 && prevPid != processes[bestIdx].pid && contextSwitchCost_ > 0) {
             gantt_.emplace_back(-2, currentTime, currentTime + contextSwitchCost_);
             currentTime += contextSwitchCost_;
             contextSwitchCount_++;
             totalContextSwitchOverhead_ += contextSwitchCost_;
+
+            // Re-evaluate in case a higher-priority job arrived during context switch
+            bestIdx = -1;
+            bestPriority = INT_MAX;
+            for (int i = 0; i < n; ++i) {
+                if (!completed[i] && processes[i].arrivalTime <= currentTime) {
+                    if (processes[i].priority < bestPriority ||
+                        (processes[i].priority == bestPriority && bestIdx >= 0 &&
+                         processes[i].arrivalTime < processes[bestIdx].arrivalTime)) {
+                        bestPriority = processes[i].priority;
+                        bestIdx = i;
+                    }
+                }
+            }
         }
+
+        auto& p = processes[bestIdx];
 
         p.responseTime = currentTime - p.arrivalTime;
 
