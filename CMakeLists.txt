@@ -25,6 +25,7 @@ add_library(schedos_core
     src/Metrics.cpp
     src/CLI.cpp
     src/GanttChart.cpp
+    src/ComparisonEngine.cpp
 )
 target_include_directories(schedos_core PUBLIC ${CMAKE_SOURCE_DIR}/include)
 

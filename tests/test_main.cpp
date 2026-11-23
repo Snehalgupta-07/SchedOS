@@ -11,6 +11,7 @@
 #include "schedos/Process.h"
 #include "schedos/ProcessManager.h"
 #include "schedos/GanttChart.h"
+#include "schedos/ComparisonEngine.h"
 #include "schedos/FCFS.h"
 #include "schedos/SJF.h"
 #include "schedos/SRTF.h"
@@ -415,6 +416,27 @@ void testContextSwitching() {
     ASSERT_EQ(idleProcs[1].completionTime, 6, "Idle to run P2 CT");
 }
 
+void testComparisonEngine() {
+    auto procs = makeStandard3();
+    auto results = ComparisonEngine::compareAll(procs, 2, 0);
+
+    ASSERT_EQ(static_cast<int>(results.size()), 5, "CompareAll returns 5 algorithms");
+    ASSERT_EQ(results[0].algorithmKey, "fcfs", "CompareAll[0] is fcfs");
+    ASSERT_EQ(results[1].algorithmKey, "sjf", "CompareAll[1] is sjf");
+    ASSERT_EQ(results[2].algorithmKey, "srtf", "CompareAll[2] is srtf");
+    ASSERT_EQ(results[3].algorithmKey, "rr", "CompareAll[3] is rr");
+    ASSERT_EQ(results[4].algorithmKey, "priority", "CompareAll[4] is priority");
+
+    // Check that SRTF has lower or equal avg waiting time than FCFS on standard3
+    ASSERT_EQ(results[2].metrics.avgWaitingTime <= results[0].metrics.avgWaitingTime, true, "SRTF avg WT <= FCFS avg WT");
+
+    // Test printComparisonTable output
+    std::ostringstream oss;
+    ComparisonEngine::printComparisonTable(results, oss, false);
+    ASSERT_EQ(!oss.str().empty(), true, "Comparison table non-empty");
+    ASSERT_EQ(oss.str().find("ALGORITHM PERFORMANCE COMPARISON BENCHMARK") != std::string::npos, true, "Comparison table header present");
+}
+
 int main() {
     std::cout << "\n========================================\n";
     std::cout <<   "   SchedOS — Scheduling Test Suite     \n";
@@ -470,6 +492,10 @@ int main() {
 
     runSection("Context Switching Tests", [] {
         testContextSwitching();
+    });
+
+    runSection("ComparisonEngine Tests", [] {
+        testComparisonEngine();
     });
 
     std::cout << "\n========================================\n";

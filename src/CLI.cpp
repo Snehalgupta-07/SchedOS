@@ -6,6 +6,7 @@
 #include "schedos/PriorityScheduling.h"
 #include "schedos/Metrics.h"
 #include "schedos/GanttChart.h"
+#include "schedos/ComparisonEngine.h"
 
 #include <fstream>
 #include <iomanip>
@@ -264,43 +265,8 @@ void CLI::handleCompareAlgorithms() {
         return;
     }
 
-    const std::vector<std::string> algs = {"fcfs", "sjf", "srtf", "rr", "priority"};
-    
-    out_ << std::left
-         << std::setw(26) << "Algorithm"
-         << std::setw(10) << "Avg WT"
-         << std::setw(10) << "Avg TAT"
-         << std::setw(10) << "Avg RT"
-         << std::setw(12) << "CPU Util(%)"
-         << std::setw(12) << "Throughput"
-         << std::setw(8)  << "CS Count"
-         << "\n";
-    out_ << std::string(88, '-') << "\n";
-
-    for (const auto& alg : algs) {
-        auto procs = manager_.getProcesses();
-        auto sched = createScheduler(alg);
-        sched->setContextSwitchCost(contextSwitchCost_);
-        sched->schedule(procs);
-        auto m = SchedulingMetrics::compute(procs, sched->ganttChart());
-
-        out_ << std::left
-             << std::setw(26) << sched->name()
-             << std::setw(10) << std::fixed << std::setprecision(2) << m.avgWaitingTime
-             << std::setw(10) << m.avgTurnaroundTime
-             << std::setw(10) << m.avgResponseTime
-             << std::setw(12) << m.cpuUtilization
-             << std::setw(12) << m.throughput
-             << std::setw(8)  << sched->contextSwitchCount()
-             << "\n";
-    }
-    out_ << "\n" << colorYellow()
-         << "  Note: Different algorithms optimize for different criteria.\n"
-         << "  - SJF/SRTF minimizes average waiting time.\n"
-         << "  - Round Robin maximizes interactive response time and fairness.\n"
-         << "  - FCFS incurs minimal scheduling overhead.\n"
-         << "  - Priority scheduling respects external urgency constraints.\n"
-         << colorReset() << "\n";
+    auto results = ComparisonEngine::compareAll(manager_.getProcesses(), timeQuantum_, contextSwitchCost_);
+    ComparisonEngine::printComparisonTable(results, out_, colorsEnabled_);
 }
 
 void CLI::handleLoadCSV() {
