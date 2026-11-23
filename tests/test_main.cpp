@@ -357,6 +357,64 @@ void testGanttChart() {
     ASSERT_EQ(!barOss.str().empty(), true, "Gantt bar chart non-empty");
 }
 
+void testContextSwitching() {
+    // 1. FCFS with context switch cost = 2
+    // P1(0, 5), P2(0, 5)
+    // P1: runs 0 to 5.
+    // CS: 5 to 7 (overhead = 2).
+    // P2: runs 7 to 12.
+    std::vector<Process> procs = { Process(1, 0, 5), Process(2, 0, 5) };
+    FCFS fcfs;
+    fcfs.setContextSwitchCost(2);
+    fcfs.schedule(procs);
+
+    ASSERT_EQ(fcfs.contextSwitchCount(), 1, "FCFS CS count");
+    ASSERT_EQ(fcfs.totalContextSwitchOverhead(), 2, "FCFS CS overhead");
+    ASSERT_EQ(procs[0].completionTime, 5, "FCFS CS P1 CT");
+    ASSERT_EQ(procs[1].completionTime, 12, "FCFS CS P2 CT");
+    ASSERT_EQ(procs[1].waitingTime, 7, "FCFS CS P2 WT");
+
+    auto m = SchedulingMetrics::compute(procs, fcfs.ganttChart(), fcfs.contextSwitchCount(), fcfs.totalContextSwitchOverhead());
+    ASSERT_EQ(m.totalBusyTime, 10, "FCFS CS busy time");
+    ASSERT_EQ(m.totalContextSwitchOverhead, 2, "FCFS CS total overhead in metrics");
+    ASSERT_EQ(m.totalSimulationDuration, 12, "FCFS CS simulation duration");
+    // Productive utilization: 10/12 ≈ 83.33%
+    ASSERT_NEAR(m.productiveCpuUtilization, (10.0 / 12.0) * 100.0, 0.01, "FCFS productive CPU util");
+    // Total occupancy: (10+2)/12 = 100%
+    ASSERT_NEAR(m.totalCpuOccupancy, 100.0, 0.01, "FCFS total CPU occupancy");
+
+    // 2. Round Robin with context switch cost = 1
+    // P1(0, 4), P2(0, 4), quantum = 2, csCost = 1
+    // t=0-2: P1
+    // t=2-3: CS (overhead 1)
+    // t=3-5: P2
+    // t=5-6: CS (overhead 1)
+    // t=6-8: P1 (finishes at 8)
+    // t=8-9: CS (overhead 1)
+    // t=9-11: P2 (finishes at 11)
+    std::vector<Process> rrProcs = { Process(1, 0, 4), Process(2, 0, 4) };
+    RoundRobin rr(2);
+    rr.setContextSwitchCost(1);
+    rr.schedule(rrProcs);
+
+    ASSERT_EQ(rr.contextSwitchCount(), 3, "RR CS count");
+    ASSERT_EQ(rr.totalContextSwitchOverhead(), 3, "RR CS overhead");
+    ASSERT_EQ(rrProcs[0].completionTime, 8, "RR CS P1 CT");
+    ASSERT_EQ(rrProcs[1].completionTime, 11, "RR CS P2 CT");
+
+    // 3. Arrival during context switch:
+    // P1 arrives at 0 (burst 3), P2 arrives at 4 (burst 2)
+    // CS cost = 2.
+    // P1 finishes at 3. CPU idle until P2 arrives at 4.
+    // Since CPU was idle from 3 to 4, waking from idle does not charge an inter-process context switch.
+    std::vector<Process> idleProcs = { Process(1, 0, 3), Process(2, 4, 2) };
+    FCFS fcfsIdle;
+    fcfsIdle.setContextSwitchCost(2);
+    fcfsIdle.schedule(idleProcs);
+    ASSERT_EQ(fcfsIdle.contextSwitchCount(), 0, "Idle to run no inter-process CS");
+    ASSERT_EQ(idleProcs[1].completionTime, 6, "Idle to run P2 CT");
+}
+
 int main() {
     std::cout << "\n========================================\n";
     std::cout <<   "   SchedOS — Scheduling Test Suite     \n";
@@ -408,6 +466,10 @@ int main() {
 
     runSection("GanttChart Tests", [] {
         testGanttChart();
+    });
+
+    runSection("Context Switching Tests", [] {
+        testContextSwitching();
     });
 
     std::cout << "\n========================================\n";

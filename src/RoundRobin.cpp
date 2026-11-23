@@ -1,6 +1,7 @@
 #include "schedos/RoundRobin.h"
 #include <algorithm>
 #include <queue>
+#include <climits>
 #include <stdexcept>
 
 namespace SchedOS {
@@ -19,13 +20,14 @@ void RoundRobin::setTimeQuantum(int q) {
 void RoundRobin::schedule(std::vector<Process>& processes) {
     if (processes.empty()) return;
 
-    gantt_.clear();
+    resetSchedulerState();
     for (auto& p : processes) p.resetSchedulingState();
     sortByArrival(processes);
 
     int n = static_cast<int>(processes.size());
     int currentTime = 0;
     int done = 0;
+    int prevPid = -1;
 
     std::queue<int> readyQueue;
     std::vector<bool> inQueue(n, false);
@@ -39,15 +41,15 @@ void RoundRobin::schedule(std::vector<Process>& processes) {
 
     while (done < n) {
         if (readyQueue.empty()) {
-            int nextArrival = processes[0].arrivalTime;
+            int nextArrival = INT_MAX;
             for (int i = 0; i < n; ++i) {
                 if (processes[i].remainingTime > 0) {
-                    nextArrival = processes[i].arrivalTime;
-                    break;
+                    nextArrival = std::min(nextArrival, processes[i].arrivalTime);
                 }
             }
             gantt_.emplace_back(-1, currentTime, nextArrival);
             currentTime = nextArrival;
+            prevPid = -1;
 
             for (int i = 0; i < n; ++i) {
                 if (!inQueue[i] && processes[i].arrivalTime <= currentTime && processes[i].remainingTime > 0) {
@@ -63,6 +65,22 @@ void RoundRobin::schedule(std::vector<Process>& processes) {
 
         auto& p = processes[idx];
 
+        // Charge context switch if switching from a different process
+        if (prevPid >= 0 && prevPid != p.pid && contextSwitchCost_ > 0) {
+            gantt_.emplace_back(-2, currentTime, currentTime + contextSwitchCost_);
+            currentTime += contextSwitchCost_;
+            contextSwitchCount_++;
+            totalContextSwitchOverhead_ += contextSwitchCost_;
+
+            // Enqueue any processes that arrived DURING the context switch interval
+            for (int i = 0; i < n; ++i) {
+                if (!inQueue[i] && processes[i].arrivalTime <= currentTime && processes[i].remainingTime > 0) {
+                    readyQueue.push(i);
+                    inQueue[i] = true;
+                }
+            }
+        }
+
         if (p.responseTime == -1) {
             p.responseTime = currentTime - p.arrivalTime;
         }
@@ -75,6 +93,7 @@ void RoundRobin::schedule(std::vector<Process>& processes) {
         p.executionIntervals.emplace_back(startTime, currentTime);
         gantt_.emplace_back(p.pid, startTime, currentTime);
 
+        // Enqueue newly arrived processes during this quantum execution
         for (int i = 0; i < n; ++i) {
             if (!inQueue[i] && processes[i].arrivalTime <= currentTime && processes[i].remainingTime > 0) {
                 readyQueue.push(i);
@@ -90,6 +109,8 @@ void RoundRobin::schedule(std::vector<Process>& processes) {
         } else {
             readyQueue.push(idx);
         }
+
+        prevPid = p.pid;
     }
 }
 

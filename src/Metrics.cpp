@@ -2,11 +2,14 @@
 #include <iostream>
 #include <iomanip>
 #include <numeric>
+#include <algorithm>
 
 namespace SchedOS {
 
 SchedulingMetrics SchedulingMetrics::compute(const std::vector<Process>& processes,
-                                              const std::vector<GanttEntry>& gantt) {
+                                             const std::vector<GanttEntry>& gantt,
+                                             int csCount,
+                                             int csOverhead) {
     SchedulingMetrics m;
     if (processes.empty()) return m;
 
@@ -27,21 +30,37 @@ SchedulingMetrics SchedulingMetrics::compute(const std::vector<Process>& process
     m.avgResponseTime   = totalResponse / n;
 
     if (!gantt.empty()) {
-        int totalTime = 0;
-        int busyTime  = 0;
         int minStart  = std::get<1>(gantt.front());
         int maxEnd    = std::get<2>(gantt.back());
 
+        int busyTime = 0;
+        int idleTime = 0;
+        int derivedCsOverhead = 0;
+        int derivedCsCount = 0;
+
         for (const auto& [pid, start, end] : gantt) {
-            if (pid != -1) {
-                busyTime += (end - start);
+            int duration = end - start;
+            if (pid >= 0) {
+                busyTime += duration;
+            } else if (pid == -1) {
+                idleTime += duration;
+            } else if (pid == -2) {
+                derivedCsOverhead += duration;
+                derivedCsCount++;
             }
         }
 
-        totalTime = maxEnd - minStart;
-        if (totalTime > 0) {
-            m.cpuUtilization = (static_cast<double>(busyTime) / totalTime) * 100.0;
-            m.throughput     = static_cast<double>(n) / totalTime;
+        m.totalBusyTime              = busyTime;
+        m.totalIdleTime              = idleTime;
+        m.totalContextSwitchOverhead = (csOverhead >= 0) ? csOverhead : derivedCsOverhead;
+        m.contextSwitchCount         = (csCount >= 0) ? csCount : derivedCsCount;
+        m.totalSimulationDuration    = maxEnd - minStart;
+
+        if (m.totalSimulationDuration > 0) {
+            m.productiveCpuUtilization = (static_cast<double>(m.totalBusyTime) / m.totalSimulationDuration) * 100.0;
+            m.cpuUtilization           = m.productiveCpuUtilization;
+            m.totalCpuOccupancy        = (static_cast<double>(m.totalBusyTime + m.totalContextSwitchOverhead) / m.totalSimulationDuration) * 100.0;
+            m.throughput               = static_cast<double>(n) / m.totalSimulationDuration;
         }
     }
 
@@ -50,12 +69,18 @@ SchedulingMetrics SchedulingMetrics::compute(const std::vector<Process>& process
 
 void SchedulingMetrics::print(std::ostream& out) const {
     out << std::fixed << std::setprecision(2);
-    out << "\n=== Scheduling Metrics ===\n";
-    out << "Average Waiting Time    : " << avgWaitingTime    << "\n";
-    out << "Average Turnaround Time : " << avgTurnaroundTime << "\n";
-    out << "Average Response Time   : " << avgResponseTime   << "\n";
-    out << "CPU Utilization         : " << cpuUtilization    << "%\n";
-    out << "Throughput              : " << throughput         << " processes/unit time\n";
+    out << "\n=== Comprehensive Scheduling & CPU Metrics ===\n";
+    out << "  Total Simulation Time    : " << totalSimulationDuration << " time units\n";
+    out << "  Total CPU Busy Time      : " << totalBusyTime << " time units\n";
+    out << "  Total CPU Idle Time      : " << totalIdleTime << " time units\n";
+    out << "  Context-Switch Overhead  : " << totalContextSwitchOverhead << " time units (" << contextSwitchCount << " switches)\n";
+    out << "  --------------------------------------------------\n";
+    out << "  Average Waiting Time     : " << avgWaitingTime    << "\n";
+    out << "  Average Turnaround Time  : " << avgTurnaroundTime << "\n";
+    out << "  Average Response Time    : " << avgResponseTime   << "\n";
+    out << "  Productive CPU Util.     : " << productiveCpuUtilization << "%\n";
+    out << "  Total CPU Occupancy      : " << totalCpuOccupancy << "%\n";
+    out << "  Throughput               : " << throughput         << " processes/unit time\n";
     out << "\n";
 }
 

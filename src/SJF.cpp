@@ -7,7 +7,7 @@ namespace SchedOS {
 void SJF::schedule(std::vector<Process>& processes) {
     if (processes.empty()) return;
 
-    gantt_.clear();
+    resetSchedulerState();
     for (auto& p : processes) p.resetSchedulingState();
     sortByArrival(processes);
 
@@ -15,6 +15,7 @@ void SJF::schedule(std::vector<Process>& processes) {
     std::vector<bool> completed(n, false);
     int currentTime = 0;
     int done = 0;
+    int prevPid = -1;
 
     while (done < n) {
         int bestIdx = -1;
@@ -38,10 +39,19 @@ void SJF::schedule(std::vector<Process>& processes) {
             }
             gantt_.emplace_back(-1, currentTime, nextArrival);
             currentTime = nextArrival;
+            prevPid = -1;
             continue;
         }
 
         auto& p = processes[bestIdx];
+
+        if (prevPid >= 0 && prevPid != p.pid && contextSwitchCost_ > 0) {
+            gantt_.emplace_back(-2, currentTime, currentTime + contextSwitchCost_);
+            currentTime += contextSwitchCost_;
+            contextSwitchCount_++;
+            totalContextSwitchOverhead_ += contextSwitchCost_;
+        }
+
         p.responseTime = currentTime - p.arrivalTime;
 
         int startTime = currentTime;
@@ -55,6 +65,7 @@ void SJF::schedule(std::vector<Process>& processes) {
         gantt_.emplace_back(p.pid, startTime, currentTime);
 
         completed[bestIdx] = true;
+        prevPid = p.pid;
         ++done;
     }
 }

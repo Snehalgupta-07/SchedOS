@@ -7,19 +7,33 @@
 
 namespace SchedOS {
 
-/// Computes and stores aggregate scheduling metrics.
+/// Computes and stores comprehensive scheduling and CPU performance metrics.
 struct SchedulingMetrics {
+    // Standard OS process metrics
     double avgWaitingTime    = 0.0;
     double avgTurnaroundTime = 0.0;
     double avgResponseTime   = 0.0;
-    double cpuUtilization    = 0.0;  // Percentage
-    double throughput        = 0.0;  // Processes per unit time
 
-    /// Computes metrics from a list of already-scheduled processes and a Gantt chart.
+    // CPU utilization & throughput
+    double cpuUtilization            = 0.0;  // Productive CPU utilization (%)
+    double productiveCpuUtilization  = 0.0;  // (Busy Time / Total Time) * 100
+    double totalCpuOccupancy         = 0.0;  // ((Busy Time + CS Overhead) / Total Time) * 100
+    double throughput                = 0.0;  // Processes per unit time
+
+    // Simulation timeline totals
+    int totalSimulationDuration      = 0;
+    int totalBusyTime                = 0;
+    int totalIdleTime                = 0;
+    int totalContextSwitchOverhead   = 0;
+    int contextSwitchCount           = 0;
+
+    /// Computes metrics from scheduled processes and Gantt chart entries.
     static SchedulingMetrics compute(const std::vector<Process>& processes,
-                                     const std::vector<GanttEntry>& gantt);
+                                     const std::vector<GanttEntry>& gantt,
+                                     int csCount = -1,
+                                     int csOverhead = -1);
 
-    /// Pretty-prints the metrics.
+    /// Formatted output of all metrics.
     void print(std::ostream& out) const;
 };
 
