@@ -2,6 +2,7 @@
 // Tests all five scheduling algorithms with known expected results.
 
 #include <iostream>
+#include <fstream>
 #include <vector>
 #include <cmath>
 #include <string>
@@ -12,6 +13,7 @@
 #include "schedos/ProcessManager.h"
 #include "schedos/GanttChart.h"
 #include "schedos/ComparisonEngine.h"
+#include "schedos/CSVManager.h"
 #include "schedos/FCFS.h"
 #include "schedos/SJF.h"
 #include "schedos/SRTF.h"
@@ -437,6 +439,78 @@ void testComparisonEngine() {
     ASSERT_EQ(oss.str().find("ALGORITHM PERFORMANCE COMPARISON BENCHMARK") != std::string::npos, true, "Comparison table header present");
 }
 
+void testCSVManager() {
+    // 1. Valid import (supports both root cwd and build/ cwd)
+    std::string samplePath = "samples/processes.csv";
+    if (!std::ifstream(samplePath).good()) {
+        samplePath = "../samples/processes.csv";
+    }
+    auto procs = CSVManager::importProcesses(samplePath);
+    ASSERT_EQ(static_cast<int>(procs.size()), 5, "CSV import 5 procs");
+    ASSERT_EQ(procs[0].pid, 1, "CSV P1 pid");
+    ASSERT_EQ(procs[0].burstTime, 8, "CSV P1 burst");
+    ASSERT_EQ(procs[4].pid, 5, "CSV P5 pid");
+    ASSERT_EQ(procs[4].priority, 0, "CSV P5 priority");
+
+    // 2. Non-existent file
+    ASSERT_THROW(CSVManager::importProcesses("samples/nonexistent_file.csv"), std::runtime_error, "CSV nonexistent file");
+
+    // 3. Validation on temp CSV files
+    {
+        // Duplicate PID
+        std::ofstream out("test_dup.csv");
+        out << "PID,Arrival,Burst,Priority\n1,0,5,1\n1,2,3,2\n";
+        out.close();
+        ASSERT_THROW(CSVManager::importProcesses("test_dup.csv"), std::invalid_argument, "CSV duplicate PID");
+    }
+    {
+        // Negative arrival
+        std::ofstream out("test_neg_arr.csv");
+        out << "PID,Arrival,Burst,Priority\n1,-5,5,1\n";
+        out.close();
+        ASSERT_THROW(CSVManager::importProcesses("test_neg_arr.csv"), std::invalid_argument, "CSV negative arrival");
+    }
+    {
+        // Zero burst
+        std::ofstream out("test_zero_burst.csv");
+        out << "PID,Arrival,Burst,Priority\n1,0,0,1\n";
+        out.close();
+        ASSERT_THROW(CSVManager::importProcesses("test_zero_burst.csv"), std::invalid_argument, "CSV zero burst");
+    }
+    {
+        // Insufficient columns
+        std::ofstream out("test_bad_cols.csv");
+        out << "PID,Arrival\n1,0\n";
+        out.close();
+        ASSERT_THROW(CSVManager::importProcesses("test_bad_cols.csv"), std::invalid_argument, "CSV bad columns");
+    }
+
+    // 4. Export results and verify file
+    {
+        FCFS fcfs;
+        fcfs.schedule(procs);
+        auto m = SchedulingMetrics::compute(procs, fcfs.ganttChart());
+        CSVManager::exportScheduleResults("test_export.csv", fcfs.name(), procs, m);
+
+        std::ifstream in("test_export.csv");
+        ASSERT_EQ(in.is_open(), true, "CSV export file created");
+        std::string firstLine;
+        std::getline(in, firstLine);
+        ASSERT_EQ(firstLine.find("# SchedOS Simulation Results") != std::string::npos, true, "CSV export header correct");
+    }
+
+    // 5. Export comparison results
+    {
+        auto compResults = ComparisonEngine::compareAll(procs, 2, 0);
+        CSVManager::exportComparisonResults("test_comp_export.csv", compResults);
+        std::ifstream in("test_comp_export.csv");
+        ASSERT_EQ(in.is_open(), true, "CSV comparison export created");
+        std::string firstLine;
+        std::getline(in, firstLine);
+        ASSERT_EQ(firstLine.find("# SchedOS Algorithm Comparison") != std::string::npos, true, "CSV comparison header correct");
+    }
+}
+
 int main() {
     std::cout << "\n========================================\n";
     std::cout <<   "   SchedOS — Scheduling Test Suite     \n";
@@ -496,6 +570,10 @@ int main() {
 
     runSection("ComparisonEngine Tests", [] {
         testComparisonEngine();
+    });
+
+    runSection("CSVManager Tests", [] {
+        testCSVManager();
     });
 
     std::cout << "\n========================================\n";

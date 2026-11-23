@@ -7,6 +7,7 @@
 #include "schedos/Metrics.h"
 #include "schedos/GanttChart.h"
 #include "schedos/ComparisonEngine.h"
+#include "schedos/CSVManager.h"
 
 #include <fstream>
 #include <iomanip>
@@ -279,56 +280,7 @@ void CLI::handleLoadCSV() {
     }
 
     try {
-        std::ifstream file(path);
-        if (!file.is_open()) {
-            out_ << colorRed() << "  [!] Error: Unable to open file: " << path << "\n" << colorReset();
-            return;
-        }
-
-        std::vector<Process> loaded;
-        std::string line;
-        int lineNum = 0;
-        while (std::getline(file, line)) {
-            ++lineNum;
-            if (line.empty() || line[0] == '#') continue;
-
-            // Check for header
-            if (lineNum == 1 && (line.find("PID") != std::string::npos || line.find("pid") != std::string::npos)) {
-                continue;
-            }
-
-            std::stringstream ss(line);
-            std::string item;
-            std::vector<std::string> tokens;
-            while (std::getline(ss, item, ',')) {
-                // Trim whitespace
-                size_t s = item.find_first_not_of(" \t\r\n");
-                size_t e = item.find_last_not_of(" \t\r\n");
-                if (s != std::string::npos) tokens.push_back(item.substr(s, e - s + 1));
-                else tokens.push_back("");
-            }
-
-            if (tokens.size() < 3) {
-                out_ << colorYellow() << "  [!] Skipping invalid line " << lineNum << ": " << line << "\n" << colorReset();
-                continue;
-            }
-
-            try {
-                int pid = std::stoi(tokens[0]);
-                int arr = std::stoi(tokens[1]);
-                int burst = std::stoi(tokens[2]);
-                int prio = tokens.size() >= 4 && !tokens[3].empty() ? std::stoi(tokens[3]) : 0;
-                loaded.emplace_back(pid, arr, burst, prio);
-            } catch (const std::exception& e) {
-                out_ << colorYellow() << "  [!] Skipping malformed data on line " << lineNum << ": " << e.what() << "\n" << colorReset();
-            }
-        }
-
-        if (loaded.empty()) {
-            out_ << colorRed() << "  [!] No valid processes found in file.\n" << colorReset();
-            return;
-        }
-
+        auto loaded = CSVManager::importProcesses(path);
         manager_.setProcesses(loaded);
         out_ << colorGreen() << "  [+] Successfully loaded " << loaded.size() << " processes from CSV.\n" << colorReset();
         handleViewProcesses();
@@ -351,27 +303,8 @@ void CLI::handleExportCSV() {
     }
 
     try {
-        std::ofstream file(path);
-        if (!file.is_open()) {
-            out_ << colorRed() << "  [!] Error: Unable to open file for writing: " << path << "\n" << colorReset();
-            return;
-        }
-
-        file << "# SchedOS Simulation Results\n";
-        file << "# Algorithm: " << lastAlgorithmRun_ << "\n";
-        file << "PID,ArrivalTime,BurstTime,Priority,CompletionTime,TurnaroundTime,WaitingTime,ResponseTime\n";
-
-        for (const auto& p : lastScheduledProcesses_) {
-            file << p.pid << ","
-                 << p.arrivalTime << ","
-                 << p.burstTime << ","
-                 << p.priority << ","
-                 << p.completionTime << ","
-                 << p.turnaroundTime << ","
-                 << p.waitingTime << ","
-                 << p.responseTime << "\n";
-        }
-
+        auto metrics = SchedulingMetrics::compute(lastScheduledProcesses_, {});
+        CSVManager::exportScheduleResults(path, lastAlgorithmRun_, lastScheduledProcesses_, metrics);
         out_ << colorGreen() << "  [+] Results exported successfully to " << path << "\n" << colorReset();
     } catch (const std::exception& e) {
         out_ << colorRed() << "  [!] Error writing CSV: " << e.what() << "\n" << colorReset();

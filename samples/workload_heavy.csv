@@ -1,0 +1,10 @@
+# SchedOS Heavy Workload Benchmark
+PID,ArrivalTime,BurstTime,Priority
+101,0,12,3
+102,2,6,1
+103,4,8,2
+104,6,3,4
+105,8,10,0
+106,12,4,2
+107,15,7,1
+108,20,5,3
