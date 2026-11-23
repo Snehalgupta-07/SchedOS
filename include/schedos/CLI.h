@@ -79,6 +79,7 @@ private:
 
     void printMenu();
     void printHeader(const std::string& title);
+    void pause();
     int readInt(const std::string& prompt, int minVal = 0, int maxVal = 1000000);
     std::string readString(const std::string& prompt);
 

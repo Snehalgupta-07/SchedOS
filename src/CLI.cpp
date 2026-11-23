@@ -91,10 +91,16 @@ void CLI::printHeader(const std::string& title) {
          << colorReset();
 }
 
+void CLI::pause() {
+    out_ << colorCyan() << "\n  [Press Enter to return to main menu...] " << colorReset();
+    std::string dummy;
+    std::getline(in_, dummy);
+}
+
 void CLI::printMenu() {
     out_ << "\n" << colorCyan() << colorBold()
          << "========================================================\n"
-         << "  SchedOS — CPU Scheduling & Process Management Simulator\n"
+         << "  SchedOS -- CPU Scheduling & Process Management Simulator\n"
          << "========================================================\n"
          << colorReset();
     out_ << colorBold() << "  Active Algorithm: " << colorYellow() << selectedAlgorithm_
@@ -143,7 +149,11 @@ void CLI::handleAddProcess() {
 void CLI::handleViewProcesses() {
     printHeader("Current Process Table");
     if (manager_.empty()) {
-        out_ << colorYellow() << "  No processes loaded. Use Option 1 to add or Option 8 to load from CSV.\n" << colorReset();
+        out_ << colorYellow() << "  [!] No processes loaded (Processes: 0).\n"
+             << "      To load processes:\n"
+             << "      - Option 1: Add a process manually.\n"
+             << "      - Option 8: Load from CSV (e.g. samples/processes.csv).\n" << colorReset();
+        pause();
         return;
     }
 
@@ -162,6 +172,7 @@ void CLI::handleViewProcesses() {
              << std::setw(10) << p.priority << "\n";
     }
     out_ << "\n  Total processes: " << manager_.size() << "\n";
+    pause();
 }
 
 void CLI::handleEditProcess() {
@@ -238,7 +249,9 @@ void CLI::handleSelectAlgorithm() {
 void CLI::handleRunSimulation() {
     printHeader("Execute Scheduling Simulation");
     if (manager_.empty()) {
-        out_ << colorYellow() << "  [!] No processes available. Please add processes first.\n" << colorReset();
+        out_ << colorYellow() << "  [!] No processes available (Processes: 0).\n"
+             << "      Please add processes first using Option 1, or load CSV via Option 8.\n" << colorReset();
+        pause();
         return;
     }
 
@@ -258,19 +271,25 @@ void CLI::handleRunSimulation() {
     // Gantt chart visualization
     GanttChart::render(scheduler->ganttChart(), out_, 80, colorsEnabled_);
 
-    auto metrics = SchedulingMetrics::compute(procs, scheduler->ganttChart());
+    auto metrics = SchedulingMetrics::compute(procs, scheduler->ganttChart(),
+                                             scheduler->contextSwitchCount(),
+                                             scheduler->totalContextSwitchOverhead());
     metrics.print(out_);
+    pause();
 }
 
 void CLI::handleCompareAlgorithms() {
     printHeader("Compare All Scheduling Algorithms");
     if (manager_.empty()) {
-        out_ << colorYellow() << "  [!] No processes available. Please add processes first.\n" << colorReset();
+        out_ << colorYellow() << "  [!] No processes available (Processes: 0).\n"
+             << "      Please add processes first using Option 1, or load CSV via Option 8.\n" << colorReset();
+        pause();
         return;
     }
 
     auto results = ComparisonEngine::compareAll(manager_.getProcesses(), timeQuantum_, contextSwitchCost_);
     ComparisonEngine::printComparisonTable(results, out_, colorsEnabled_);
+    pause();
 }
 
 void CLI::handleLoadCSV() {
