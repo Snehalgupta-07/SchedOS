@@ -4,6 +4,7 @@
 #include <iostream>
 #include <fstream>
 #include <vector>
+#include <thread>
 #include <cmath>
 #include <string>
 #include <sstream>
@@ -14,6 +15,7 @@
 #include "schedos/GanttChart.h"
 #include "schedos/ComparisonEngine.h"
 #include "schedos/CSVManager.h"
+#include "schedos/TaskQueue.h"
 #include "schedos/FCFS.h"
 #include "schedos/SJF.h"
 #include "schedos/SRTF.h"
@@ -581,6 +583,77 @@ void testContextSwitchOrderChange() {
     ASSERT_EQ(sjfWithCS.contextSwitchCount(), 2, "With-CS 2 context switches charged");
 }
 
+void testTaskQueue() {
+    // 1. Basic push, size, pop
+    TaskQueue queue;
+    ASSERT_EQ(queue.empty(), true, "TQ empty initially");
+    ASSERT_EQ(static_cast<int>(queue.size()), 0, "TQ size 0 initially");
+
+    int runCount = 0;
+    queue.push([&runCount]() { runCount += 10; });
+    queue.push([&runCount]() { runCount += 20; });
+    ASSERT_EQ(queue.empty(), false, "TQ not empty after pushes");
+    ASSERT_EQ(static_cast<int>(queue.size()), 2, "TQ size 2");
+
+    Task t;
+    bool popped1 = queue.pop(t);
+    ASSERT_EQ(popped1, true, "TQ popped1 success");
+    t();
+    ASSERT_EQ(runCount, 10, "TQ task 1 executed");
+
+    bool popped2 = queue.tryPop(t);
+    ASSERT_EQ(popped2, true, "TQ tryPop success");
+    t();
+    ASSERT_EQ(runCount, 30, "TQ task 2 executed");
+
+    bool popped3 = queue.tryPop(t);
+    ASSERT_EQ(popped3, false, "TQ tryPop empty false");
+
+    // 2. Stop wakes threads
+    queue.stop();
+    ASSERT_EQ(queue.isStopped(), true, "TQ isStopped true");
+    bool poppedAfterStop = queue.pop(t);
+    ASSERT_EQ(poppedAfterStop, false, "TQ pop after stop returns false");
+
+    // 3. Multi-threaded Producer-Consumer
+    TaskQueue mtQueue;
+    std::atomic<int> processedSum{0};
+    const int tasksPerProducer = 100;
+    const int numProducers = 3;
+    const int numConsumers = 3;
+
+    std::vector<std::thread> consumers;
+    for (int i = 0; i < numConsumers; ++i) {
+        consumers.emplace_back([&mtQueue, &processedSum]() {
+            Task task;
+            while (mtQueue.pop(task)) {
+                task();
+            }
+        });
+    }
+
+    std::vector<std::thread> producers;
+    for (int p = 0; p < numProducers; ++p) {
+        producers.emplace_back([&mtQueue, &processedSum, tasksPerProducer]() {
+            for (int k = 0; k < tasksPerProducer; ++k) {
+                mtQueue.push([&processedSum]() {
+                    processedSum.fetch_add(1, std::memory_order_relaxed);
+                });
+            }
+        });
+    }
+
+    for (auto& pt : producers) pt.join();
+    // Wait until all tasks processed, then stop queue
+    while (processedSum.load() < numProducers * tasksPerProducer) {
+        std::this_thread::yield();
+    }
+    mtQueue.stop();
+    for (auto& ct : consumers) ct.join();
+
+    ASSERT_EQ(processedSum.load(), numProducers * tasksPerProducer, "TQ MT sum matches");
+}
+
 int main() {
     std::cout << "\n========================================\n";
     std::cout <<   "   SchedOS — Scheduling Test Suite     \n";
@@ -649,6 +722,10 @@ int main() {
     runSection("Advanced Verification Tests", [] {
         testRepeatedSimulations();
         testContextSwitchOrderChange();
+    });
+
+    runSection("TaskQueue Tests", [] {
+        testTaskQueue();
     });
 
     std::cout << "\n========================================\n";

@@ -27,6 +27,7 @@ add_library(schedos_core
     src/GanttChart.cpp
     src/ComparisonEngine.cpp
     src/CSVManager.cpp
+    src/TaskQueue.cpp
 )
 target_include_directories(schedos_core PUBLIC ${CMAKE_SOURCE_DIR}/include)
 
