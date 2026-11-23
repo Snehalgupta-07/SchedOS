@@ -16,6 +16,7 @@
 #include "schedos/GanttChart.h"
 #include "schedos/CSVManager.h"
 #include "schedos/ComparisonEngine.h"
+#include "schedos/BenchmarkEngine.h"
 
 using namespace SchedOS;
 
@@ -42,6 +43,7 @@ void printUsage(const char* progName) {
     std::cout << "  -a <algorithm>  Algorithm: fcfs, sjf, srtf, rr, priority, all (default: all)\n";
     std::cout << "  -q <quantum>    Time quantum for Round Robin (default: 2)\n";
     std::cout << "  -c <cost>       Context switch cost (default: 0)\n";
+    std::cout << "  -b              Run concurrency & multithreading benchmark\n";
     std::cout << "  -h              Show this help message\n\n";
 }
 
@@ -83,6 +85,10 @@ int main(int argc, char* argv[]) {
             quantum = std::atoi(argv[++i]);
         } else if (arg == "-c" && i + 1 < argc) {
             csCost = std::atoi(argv[++i]);
+        } else if (arg == "-b" || arg == "--benchmark") {
+            auto res = BenchmarkEngine::run(100, 0, 25000, 3);
+            BenchmarkEngine::printReport(res, std::cout, true);
+            return 0;
         } else if (arg == "-h" || arg == "--help") {
             printUsage(argv[0]);
             return 0;

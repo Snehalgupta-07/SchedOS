@@ -2,6 +2,7 @@
 
 #include "schedos/ProcessManager.h"
 #include "schedos/Scheduler.h"
+#include "schedos/BenchmarkEngine.h"
 #include <iostream>
 #include <memory>
 #include <string>
@@ -27,6 +28,15 @@ public:
     void handleExportCSV();
     void handleResetSimulation();
 
+    /// Concurrency & Multithreading Handlers
+    void handleConcurrencyMenu();
+    void handleRunMultithreadedDemo();
+    void handleConfigureWorkerCount();
+    void handleRunSequentialBenchmark();
+    void handleRunParallelBenchmark();
+    void handleCompareBenchmarks();
+    void handleViewThreadPoolStats();
+
     // Configuration
     void setTimeQuantum(int q);
     int getTimeQuantum() const { return timeQuantum_; }
@@ -34,6 +44,9 @@ public:
     int getContextSwitchCost() const { return contextSwitchCost_; }
     void setSelectedAlgorithm(const std::string& alg) { selectedAlgorithm_ = alg; }
     const std::string& getSelectedAlgorithm() const { return selectedAlgorithm_; }
+
+    void setWorkerCount(size_t threads) { benchmarkThreads_ = threads; }
+    size_t getWorkerCount() const { return benchmarkThreads_; }
 
     ProcessManager& getProcessManager() { return manager_; }
     const ProcessManager& getProcessManager() const { return manager_; }
@@ -50,6 +63,15 @@ private:
     int timeQuantum_ = 2;
     int contextSwitchCost_ = 0;
     bool colorsEnabled_ = true;
+
+    // Concurrency benchmark configuration
+    size_t benchmarkThreads_ = 0;
+    size_t benchmarkTasks_ = 100;
+    int benchmarkIterations_ = 25000;
+    double lastSeqTimeMs_ = 0.0;
+    double lastParTimeMs_ = 0.0;
+    bool hasLastSeq_ = false;
+    bool hasLastPar_ = false;
 
     // Last simulation results for export
     std::vector<Process> lastScheduledProcesses_;

@@ -8,6 +8,8 @@
 #include "schedos/GanttChart.h"
 #include "schedos/ComparisonEngine.h"
 #include "schedos/CSVManager.h"
+#include "schedos/ThreadPool.h"
+#include "schedos/BenchmarkEngine.h"
 
 #include <fstream>
 #include <iomanip>
@@ -114,7 +116,8 @@ void CLI::printMenu() {
     out_ << "  " << colorGreen() << "8." << colorReset() << " Load processes from CSV\n";
     out_ << "  " << colorGreen() << "9." << colorReset() << " Export results to CSV\n";
     out_ << "  " << colorGreen() << "10." << colorReset() << " Reset simulation\n";
-    out_ << "  " << colorRed()   << "11." << colorReset() << " Exit\n";
+    out_ << "  " << colorCyan()  << "11." << colorReset() << " Concurrency & Multithreading Benchmarking Suite\n";
+    out_ << "  " << colorRed()   << "12." << colorReset() << " Exit\n";
     out_ << "--------------------------------------------------------\n";
 }
 
@@ -322,11 +325,185 @@ void CLI::handleResetSimulation() {
     out_ << colorGreen() << "  [+] Simulation reset. All processes cleared and settings restored to default.\n" << colorReset();
 }
 
+void CLI::handleConcurrencyMenu() {
+    bool inSubmenu = true;
+    while (inSubmenu) {
+        size_t effectiveThreads = benchmarkThreads_ == 0 ? std::thread::hardware_concurrency() : benchmarkThreads_;
+        if (effectiveThreads == 0) effectiveThreads = 2;
+
+        out_ << "\n" << colorCyan() << colorBold()
+             << "========================================================\n"
+             << "       SchedOS Concurrency & Multithreading Suite       \n"
+             << "========================================================\n"
+             << colorReset();
+        out_ << "  Configured Workers: " << colorYellow() << effectiveThreads << colorReset()
+             << " | Tasks: " << colorYellow() << benchmarkTasks_ << colorReset()
+             << " | Iterations: " << colorYellow() << benchmarkIterations_ << colorReset() << "\n";
+        out_ << "--------------------------------------------------------\n";
+        out_ << "  1. Run multithreaded workload demonstration\n";
+        out_ << "  2. Configure worker thread count\n";
+        out_ << "  3. Execute sequential benchmark\n";
+        out_ << "  4. Execute parallel benchmark\n";
+        out_ << "  5. Compare benchmark results (Sequential vs Parallel)\n";
+        out_ << "  6. View thread pool statistics\n";
+        out_ << "  7. Return to main menu\n";
+        out_ << "--------------------------------------------------------\n";
+
+        int subChoice = readInt("  Select option (1-7): ", 1, 7);
+        switch (subChoice) {
+            case 1: handleRunMultithreadedDemo(); break;
+            case 2: handleConfigureWorkerCount(); break;
+            case 3: handleRunSequentialBenchmark(); break;
+            case 4: handleRunParallelBenchmark(); break;
+            case 5: handleCompareBenchmarks(); break;
+            case 6: handleViewThreadPoolStats(); break;
+            case 7: inSubmenu = false; break;
+        }
+    }
+}
+
+void CLI::handleRunMultithreadedDemo() {
+    printHeader("Multithreaded Workload Live Demonstration");
+    size_t numThreads = benchmarkThreads_ == 0 ? std::thread::hardware_concurrency() : benchmarkThreads_;
+    if (numThreads == 0) numThreads = 2;
+
+    out_ << "  Spawning ThreadPool with " << numThreads << " real worker threads...\n";
+    ThreadPool pool(numThreads);
+    std::atomic<int> completed{0};
+    const int demoTasks = 20;
+
+    static std::mutex printMutex;
+    out_ << "  Submitting " << demoTasks << " concurrent CPU-bound tasks to Thread-Safe TaskQueue...\n";
+    for (int i = 1; i <= demoTasks; ++i) {
+        pool.submitVoid([i, &completed, this]() {
+            BenchmarkEngine::executeTask(i, 20000);
+            int done = completed.fetch_add(1, std::memory_order_relaxed) + 1;
+            if (done % 5 == 0 || done == demoTasks) {
+                std::lock_guard<std::mutex> lock(printMutex);
+                out_ << "    [Worker Thread] Progress: " << done << "/" << demoTasks << " tasks completed.\n";
+            }
+        });
+    }
+
+    pool.waitForTasks();
+    out_ << colorGreen() << "  [+] All " << demoTasks << " tasks processed concurrently and verified successfully!\n" << colorReset();
+}
+
+void CLI::handleConfigureWorkerCount() {
+    printHeader("Configure Concurrency Settings");
+    size_t hw = std::thread::hardware_concurrency();
+    out_ << "  Hardware logical cores detected: " << hw << "\n";
+    out_ << "  (Enter 0 to use hardware default)\n";
+
+    int threads = readInt("  Enter worker thread count (0-64): ", 0, 64);
+    benchmarkThreads_ = static_cast<size_t>(threads);
+
+    int tasks = readInt("  Enter benchmark task count (10-1000): ", 10, 1000);
+    benchmarkTasks_ = static_cast<size_t>(tasks);
+
+    int iters = readInt("  Enter iterations per task (1000-200000): ", 1000, 200000);
+    benchmarkIterations_ = iters;
+
+    out_ << colorGreen() << "  [+] Settings updated. Threads: "
+         << (benchmarkThreads_ == 0 ? hw : benchmarkThreads_)
+         << ", Tasks: " << benchmarkTasks_
+         << ", Iterations: " << benchmarkIterations_ << "\n" << colorReset();
+}
+
+void CLI::handleRunSequentialBenchmark() {
+    printHeader("Execute Sequential Benchmark");
+    out_ << "  Executing " << benchmarkTasks_ << " CPU-bound tasks sequentially on a single thread...\n";
+
+    auto tStart = std::chrono::steady_clock::now();
+    uint64_t checksum = 0;
+    for (size_t i = 0; i < benchmarkTasks_; ++i) {
+        checksum += BenchmarkEngine::executeTask(i, benchmarkIterations_);
+    }
+    auto tEnd = std::chrono::steady_clock::now();
+
+    lastSeqTimeMs_ = std::chrono::duration<double, std::milli>(tEnd - tStart).count();
+    hasLastSeq_ = true;
+
+    double throughput = (lastSeqTimeMs_ > 0.0) ? (benchmarkTasks_ / (lastSeqTimeMs_ / 1000.0)) : 0.0;
+    out_ << colorGreen() << "  [+] Sequential Execution Completed:\n" << colorReset()
+         << "      Duration   : " << lastSeqTimeMs_ << " ms\n"
+         << "      Throughput : " << throughput << " tasks/sec\n"
+         << "      Checksum   : 0x" << std::hex << checksum << std::dec << "\n";
+}
+
+void CLI::handleRunParallelBenchmark() {
+    printHeader("Execute Parallel Benchmark");
+    size_t numThreads = benchmarkThreads_ == 0 ? std::thread::hardware_concurrency() : benchmarkThreads_;
+    if (numThreads == 0) numThreads = 2;
+
+    out_ << "  Executing " << benchmarkTasks_ << " CPU-bound tasks across "
+         << numThreads << " worker threads...\n";
+
+    ThreadPool pool(numThreads);
+    std::vector<std::future<uint64_t>> futures;
+    futures.reserve(benchmarkTasks_);
+
+    auto tStart = std::chrono::steady_clock::now();
+    for (size_t i = 0; i < benchmarkTasks_; ++i) {
+        futures.push_back(pool.submit([i, this]() {
+            return BenchmarkEngine::executeTask(i, benchmarkIterations_);
+        }));
+    }
+
+    uint64_t checksum = 0;
+    for (size_t i = 0; i < benchmarkTasks_; ++i) {
+        checksum += futures[i].get();
+    }
+    auto tEnd = std::chrono::steady_clock::now();
+
+    lastParTimeMs_ = std::chrono::duration<double, std::milli>(tEnd - tStart).count();
+    hasLastPar_ = true;
+
+    double throughput = (lastParTimeMs_ > 0.0) ? (benchmarkTasks_ / (lastParTimeMs_ / 1000.0)) : 0.0;
+    out_ << colorGreen() << "  [+] Parallel Execution Completed (" << numThreads << " threads):\n" << colorReset()
+         << "      Duration   : " << lastParTimeMs_ << " ms\n"
+         << "      Throughput : " << throughput << " tasks/sec\n"
+         << "      Checksum   : 0x" << std::hex << checksum << std::dec << "\n";
+}
+
+void CLI::handleCompareBenchmarks() {
+    printHeader("Sequential vs Parallel Benchmark Comparison");
+    size_t numThreads = benchmarkThreads_ == 0 ? std::thread::hardware_concurrency() : benchmarkThreads_;
+    if (numThreads == 0) numThreads = 2;
+
+    out_ << "  Running automated benchmark with " << benchmarkTasks_ << " tasks on "
+         << numThreads << " threads (median of 3 runs)...\n";
+
+    auto res = BenchmarkEngine::run(benchmarkTasks_, numThreads, benchmarkIterations_, 3);
+    BenchmarkEngine::printReport(res, out_, colorsEnabled_);
+}
+
+void CLI::handleViewThreadPoolStats() {
+    printHeader("Thread Pool & Hardware Statistics");
+    size_t hw = std::thread::hardware_concurrency();
+    size_t configured = benchmarkThreads_ == 0 ? hw : benchmarkThreads_;
+
+    out_ << "  Hardware Logical Cores       : " << hw << "\n";
+    out_ << "  Configured Worker Threads    : " << configured << "\n";
+    out_ << "  Configured Tasks Per Batch   : " << benchmarkTasks_ << "\n";
+    out_ << "  Task Workload Iterations     : " << benchmarkIterations_ << "\n";
+    out_ << "  Synchronization Primitives   : std::mutex, std::condition_variable\n";
+    out_ << "  Task Queue Type              : Thread-safe FIFO Queue\n";
+    out_ << "  Resource Management          : RAII (Thread joining in destructor)\n";
+    out_ << "  Exception Safety             : Try-catch protected worker loop\n\n";
+
+    if (hasLastSeq_ && hasLastPar_) {
+        double speedup = lastParTimeMs_ > 0.0 ? (lastSeqTimeMs_ / lastParTimeMs_) : 1.0;
+        out_ << "  Last Measured Speedup        : " << colorGreen() << speedup << "x" << colorReset()
+             << " (" << lastSeqTimeMs_ << " ms vs " << lastParTimeMs_ << " ms)\n";
+    }
+}
+
 void CLI::run() {
     bool running = true;
     while (running) {
         printMenu();
-        int choice = readInt("  Enter your choice (1-11): ", 1, 11);
+        int choice = readInt("  Enter your choice (1-12): ", 1, 12);
         switch (choice) {
             case 1:  handleAddProcess(); break;
             case 2:  handleViewProcesses(); break;
@@ -338,7 +515,8 @@ void CLI::run() {
             case 8:  handleLoadCSV(); break;
             case 9:  handleExportCSV(); break;
             case 10: handleResetSimulation(); break;
-            case 11:
+            case 11: handleConcurrencyMenu(); break;
+            case 12:
                 out_ << "\n" << colorCyan() << "  Thank you for using SchedOS. Goodbye!\n\n" << colorReset();
                 running = false;
                 break;
