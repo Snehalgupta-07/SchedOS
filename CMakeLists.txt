@@ -28,6 +28,7 @@ add_library(schedos_core
     src/ComparisonEngine.cpp
     src/CSVManager.cpp
     src/TaskQueue.cpp
+    src/ThreadPool.cpp
 )
 target_include_directories(schedos_core PUBLIC ${CMAKE_SOURCE_DIR}/include)
 

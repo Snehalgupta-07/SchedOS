@@ -16,6 +16,7 @@
 #include "schedos/ComparisonEngine.h"
 #include "schedos/CSVManager.h"
 #include "schedos/TaskQueue.h"
+#include "schedos/ThreadPool.h"
 #include "schedos/FCFS.h"
 #include "schedos/SJF.h"
 #include "schedos/SRTF.h"
@@ -654,6 +655,69 @@ void testTaskQueue() {
     ASSERT_EQ(processedSum.load(), numProducers * tasksPerProducer, "TQ MT sum matches");
 }
 
+void testThreadPool() {
+    // 1. Worker count configuration
+    {
+        ThreadPool pool(4);
+        ASSERT_EQ(pool.workerCount(), static_cast<size_t>(4), "TP 4 workers");
+        ASSERT_EQ(pool.isShutdown(), false, "TP not shut down initially");
+    }
+
+    // 2. Submit with std::future return
+    {
+        ThreadPool pool(3);
+        auto fut1 = pool.submit([](int a, int b) { return a * b; }, 6, 7);
+        auto fut2 = pool.submit([](const std::string& s) { return s + " World"; }, "Hello");
+
+        ASSERT_EQ(fut1.get(), 42, "TP future multiply 42");
+        ASSERT_EQ(fut2.get(), std::string("Hello World"), "TP future string");
+    }
+
+    // 3. submitVoid and waitForTasks()
+    {
+        ThreadPool pool(4);
+        std::atomic<int> counter{0};
+        const int numTasks = 50;
+
+        for (int i = 0; i < numTasks; ++i) {
+            pool.submitVoid([&counter]() {
+                std::this_thread::sleep_for(std::chrono::milliseconds(1));
+                counter.fetch_add(1, std::memory_order_relaxed);
+            });
+        }
+
+        pool.waitForTasks();
+        ASSERT_EQ(counter.load(), numTasks, "TP waitForTasks all completed");
+        ASSERT_EQ(pool.completedTaskCount(), static_cast<size_t>(numTasks), "TP completedTaskCount matches");
+    }
+
+    // 4. Exception resilience: task throws, pool worker survives
+    {
+        ThreadPool pool(2);
+        auto futFail = pool.submit([]() -> int {
+            throw std::runtime_error("Task deliberate exception");
+        });
+
+        bool caught = false;
+        try {
+            futFail.get();
+        } catch (const std::runtime_error&) {
+            caught = true;
+        }
+        ASSERT_EQ(caught, true, "TP future caught task exception");
+
+        // Subsequent task still works!
+        auto futSuccess = pool.submit([]() { return 100; });
+        ASSERT_EQ(futSuccess.get(), 100, "TP worker survived exception");
+    }
+
+    // 5. Repeated creation and destruction without hang
+    for (int rep = 0; rep < 5; ++rep) {
+        ThreadPool pool(2);
+        pool.submitVoid([]() {});
+    }
+}
+
 int main() {
     std::cout << "\n========================================\n";
     std::cout <<   "   SchedOS — Scheduling Test Suite     \n";
@@ -726,6 +790,10 @@ int main() {
 
     runSection("TaskQueue Tests", [] {
         testTaskQueue();
+    });
+
+    runSection("ThreadPool Tests", [] {
+        testThreadPool();
     });
 
     std::cout << "\n========================================\n";
