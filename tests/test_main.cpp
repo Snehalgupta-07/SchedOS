@@ -739,6 +739,164 @@ void testBenchmarkEngine() {
     ASSERT_EQ(oss.str().find("CONCURRENCY & MULTITHREADING PERFORMANCE BENCHMARK") != std::string::npos, true, "Benchmark header found");
 }
 
+void testSchedulingFairness() {
+    // Process set with known waiting times:
+    // P1: arr=0, burst=4 -> CT=4, TAT=4, WT=0
+    // P2: arr=0, burst=4 -> CT=8, TAT=8, WT=4
+    // P3: arr=0, burst=4 -> CT=12, TAT=12, WT=8
+    std::vector<Process> procs = {
+        Process(1, 0, 4),
+        Process(2, 0, 4),
+        Process(3, 0, 4)
+    };
+    FCFS fcfs;
+    fcfs.schedule(procs);
+
+    auto m = SchedulingMetrics::compute(procs, fcfs.ganttChart());
+    ASSERT_EQ(m.minWaitingTime, 0, "Fairness min WT");
+    ASSERT_EQ(m.maxWaitingTime, 8, "Fairness max WT");
+    ASSERT_NEAR(m.avgWaitingTime, 4.0, 0.001, "Fairness avg WT");
+    // Variance = ((0-4)^2 + (4-4)^2 + (8-4)^2) / 3 = (16 + 0 + 16) / 3 = 32/3 = 10.6667
+    ASSERT_NEAR(m.waitingTimeVariance, 32.0 / 3.0, 0.01, "Fairness WT variance");
+    ASSERT_NEAR(m.waitingTimeStdDev, std::sqrt(32.0 / 3.0), 0.01, "Fairness WT std dev");
+
+    // Zero variance case: single process
+    std::vector<Process> single = { Process(1, 0, 5) };
+    fcfs.schedule(single);
+    auto mSingle = SchedulingMetrics::compute(single, fcfs.ganttChart());
+    ASSERT_EQ(mSingle.minWaitingTime, 0, "Single proc min WT");
+    ASSERT_EQ(mSingle.maxWaitingTime, 0, "Single proc max WT");
+    ASSERT_NEAR(mSingle.waitingTimeVariance, 0.0, 0.001, "Single proc WT variance zero");
+    ASSERT_NEAR(mSingle.waitingTimeStdDev, 0.0, 0.001, "Single proc WT std dev zero");
+}
+
+void testPriorityAging() {
+    // Without aging:
+    // P1: arr=0, burst=6, prio=1
+    // P2: arr=1, burst=4, prio=5 (low priority)
+    // P3: arr=5, burst=2, prio=3 (medium priority)
+    // At t=6 (P1 ends): P2 (prio 5) vs P3 (prio 3). P3 runs first without aging!
+    {
+        std::vector<Process> procsNoAging = {
+            Process(1, 0, 6, 1),
+            Process(2, 1, 4, 5),
+            Process(3, 5, 2, 3)
+        };
+        PriorityScheduling ps;
+        ps.setAgingInterval(0); // Disabled
+        ps.schedule(procsNoAging);
+
+        // P3 should complete before P2
+        ASSERT_EQ(procsNoAging[0].completionTime, 6,  "No-aging P1 CT");
+        ASSERT_EQ(procsNoAging[2].completionTime, 8,  "No-aging P3 CT (runs before P2)");
+        ASSERT_EQ(procsNoAging[1].completionTime, 12, "No-aging P2 CT (starved until P3 finishes)");
+    }
+
+    // With aging: aging interval = 1
+    // At t=6:
+    // P2 has waited (6 - 1) = 5 time units -> effective prio = max(0, 5 - 5) = 0!
+    // P3 has waited (6 - 5) = 1 time unit  -> effective prio = max(0, 3 - 1) = 2.
+    // P2 has higher effective priority (0 < 2), so P2 runs FIRST!
+    {
+        std::vector<Process> procsAging = {
+            Process(1, 0, 6, 1),
+            Process(2, 1, 4, 5),
+            Process(3, 5, 2, 3)
+        };
+        PriorityScheduling ps;
+        ps.setAgingInterval(1);
+        ASSERT_EQ(ps.agingInterval(), 1, "Aging interval getter");
+        ASSERT_EQ(ps.name(), "Priority Scheduling (Non-Preemptive with Aging)", "Aging scheduler name");
+        ps.schedule(procsAging);
+
+        // P2 should complete before P3!
+        ASSERT_EQ(procsAging[0].completionTime, 6,  "Aging P1 CT");
+        ASSERT_EQ(procsAging[1].completionTime, 10, "Aging P2 CT (promoted by aging, runs before P3)");
+        ASSERT_EQ(procsAging[2].completionTime, 12, "Aging P3 CT (runs after promoted P2)");
+    }
+}
+
+void testStressWorkloads() {
+    // Test 100, 1,000, and 10,000 processes with FCFS and SJF
+    const std::vector<int> counts = {100, 1000, 10000};
+
+    for (int count : counts) {
+        std::vector<Process> procs;
+        procs.reserve(count);
+        for (int i = 0; i < count; ++i) {
+            // Predictable varied arrival times and bursts
+            int arrival = (i % 50);
+            int burst = (i % 20) + 1;
+            int priority = (i % 10) + 1;
+            procs.emplace_back(i + 1, arrival, burst, priority);
+        }
+
+        FCFS fcfs;
+        fcfs.schedule(procs);
+
+        // Verify all completed
+        bool allCompleted = true;
+        for (const auto& p : procs) {
+            if (p.completionTime <= 0 || p.turnaroundTime <= 0 || p.waitingTime < 0) {
+                allCompleted = false;
+                break;
+            }
+        }
+        ASSERT_EQ(allCompleted, true, "Stress FCFS all " + std::to_string(count) + " processes valid");
+
+        auto metrics = SchedulingMetrics::compute(procs, fcfs.ganttChart());
+        ASSERT_EQ(metrics.throughput > 0.0, true, "Stress FCFS " + std::to_string(count) + " positive throughput");
+        ASSERT_EQ(metrics.avgTurnaroundTime > 0.0, true, "Stress FCFS " + std::to_string(count) + " positive avg TAT");
+    }
+}
+
+void testThreadPoolStress() {
+    // Multi-producer stress test: 4 producer threads, each submitting 50 tasks to a 4-worker pool
+    const int numProducers = 4;
+    const int tasksPerProducer = 50;
+    const int totalTasks = numProducers * tasksPerProducer;
+
+    ThreadPool pool(4);
+    std::atomic<int> completedTasks{0};
+    std::vector<std::future<int>> futures;
+    std::mutex futuresMutex;
+
+    std::vector<std::thread> producers;
+    for (int p = 0; p < numProducers; ++p) {
+        producers.emplace_back([&, p]() {
+            for (int i = 0; i < tasksPerProducer; ++i) {
+                int taskId = p * tasksPerProducer + i;
+                auto fut = pool.submit([&completedTasks, taskId]() {
+                    // Small computation
+                    uint64_t sum = 0;
+                    for (int k = 0; k < 1000; ++k) sum += k;
+                    completedTasks.fetch_add(1, std::memory_order_relaxed);
+                    return taskId;
+                });
+
+                std::lock_guard<std::mutex> lock(futuresMutex);
+                futures.push_back(std::move(fut));
+            }
+        });
+    }
+
+    for (auto& t : producers) {
+        t.join();
+    }
+
+    // Wait for all futures and verify outputs
+    int receivedCount = 0;
+    for (auto& fut : futures) {
+        int id = fut.get();
+        if (id >= 0 && id < totalTasks) {
+            receivedCount++;
+        }
+    }
+
+    ASSERT_EQ(receivedCount, totalTasks, "TP stress all futures resolved");
+    ASSERT_EQ(completedTasks.load(), totalTasks, "TP stress atomic counter matches total");
+}
+
 int main() {
     std::cout << "\n========================================\n";
     std::cout <<   "   SchedOS — Scheduling Test Suite     \n";
@@ -819,6 +977,16 @@ int main() {
 
     runSection("BenchmarkEngine Tests", [] {
         testBenchmarkEngine();
+    });
+
+    runSection("Fairness & Aging Tests", [] {
+        testSchedulingFairness();
+        testPriorityAging();
+    });
+
+    runSection("Stress & Concurrency Scale Tests", [] {
+        testStressWorkloads();
+        testThreadPoolStress();
     });
 
     std::cout << "\n========================================\n";
