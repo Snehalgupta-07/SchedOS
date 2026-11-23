@@ -13,6 +13,7 @@
 #include "schedos/PriorityScheduling.h"
 #include "schedos/Metrics.h"
 #include "schedos/CLI.h"
+#include "schedos/GanttChart.h"
 
 using namespace SchedOS;
 
@@ -51,7 +52,7 @@ void runAlgorithm(Scheduler& scheduler, std::vector<Process> processes, int csCo
     scheduler.schedule(processes);
 
     printProcessTable(processes, std::cout);
-    printGanttChart(scheduler.ganttChart());
+    GanttChart::render(scheduler.ganttChart(), std::cout, 80, true);
 
     auto metrics = SchedulingMetrics::compute(processes, scheduler.ganttChart());
     metrics.print(std::cout);

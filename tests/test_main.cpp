@@ -10,6 +10,7 @@
 
 #include "schedos/Process.h"
 #include "schedos/ProcessManager.h"
+#include "schedos/GanttChart.h"
 #include "schedos/FCFS.h"
 #include "schedos/SJF.h"
 #include "schedos/SRTF.h"
@@ -313,6 +314,49 @@ void testProcessManager() {
     ASSERT_EQ(pm.empty(), true, "PM empty after clear");
 }
 
+void testGanttChart() {
+    // 1. mergeAdjacent
+    std::vector<GanttEntry> raw = {
+        {1, 0, 2},
+        {1, 2, 5},
+        {2, 5, 8},
+        {1, 8, 10},
+        {1, 10, 12},
+        {-1, 12, 15},
+        {-1, 15, 18}
+    };
+    auto merged = GanttChart::mergeAdjacent(raw);
+    ASSERT_EQ(static_cast<int>(merged.size()), 4, "Gantt mergeAdjacent count");
+    ASSERT_EQ(std::get<0>(merged[0]), 1, "Gantt merged[0] pid");
+    ASSERT_EQ(std::get<1>(merged[0]), 0, "Gantt merged[0] start");
+    ASSERT_EQ(std::get<2>(merged[0]), 5, "Gantt merged[0] end");
+
+    ASSERT_EQ(std::get<0>(merged[1]), 2, "Gantt merged[1] pid");
+    ASSERT_EQ(std::get<2>(merged[1]), 8, "Gantt merged[1] end");
+
+    ASSERT_EQ(std::get<0>(merged[2]), 1, "Gantt merged[2] pid");
+    ASSERT_EQ(std::get<2>(merged[2]), 12, "Gantt merged[2] end");
+
+    ASSERT_EQ(std::get<0>(merged[3]), -1, "Gantt merged[3] pid (idle)");
+    ASSERT_EQ(std::get<2>(merged[3]), 18, "Gantt merged[3] end");
+
+    // 2. renderTimeline
+    std::ostringstream oss;
+    GanttChart::renderTimeline(merged, oss, false);
+    std::string outStr = oss.str();
+    bool hasP1 = outStr.find("P1 [0-5]") != std::string::npos;
+    bool hasP2 = outStr.find("P2 [5-8]") != std::string::npos;
+    bool hasIdle = outStr.find("IDLE [12-18]") != std::string::npos;
+    ASSERT_EQ(hasP1, true, "Gantt timeline has P1 [0-5]");
+    ASSERT_EQ(hasP2, true, "Gantt timeline has P2 [5-8]");
+    ASSERT_EQ(hasIdle, true, "Gantt timeline has IDLE [12-18]");
+
+    // 3. renderBarChart does not crash and outputs content
+    std::ostringstream barOss;
+    GanttChart::renderBarChart(merged, barOss, 80, false);
+    ASSERT_EQ(!barOss.str().empty(), true, "Gantt bar chart non-empty");
+}
+
 int main() {
     std::cout << "\n========================================\n";
     std::cout <<   "   SchedOS — Scheduling Test Suite     \n";
@@ -360,6 +404,10 @@ int main() {
 
     runSection("ProcessManager Tests", [] {
         testProcessManager();
+    });
+
+    runSection("GanttChart Tests", [] {
+        testGanttChart();
     });
 
     std::cout << "\n========================================\n";

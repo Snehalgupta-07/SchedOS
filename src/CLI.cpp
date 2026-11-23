@@ -5,6 +5,7 @@
 #include "schedos/RoundRobin.h"
 #include "schedos/PriorityScheduling.h"
 #include "schedos/Metrics.h"
+#include "schedos/GanttChart.h"
 
 #include <fstream>
 #include <iomanip>
@@ -249,17 +250,8 @@ void CLI::handleRunSimulation() {
     lastScheduledProcesses_ = procs;
     lastAlgorithmRun_ = scheduler->name();
 
-    // Gantt chart
-    out_ << colorBold() << "\nGantt Chart Timeline:\n" << colorReset();
-    for (const auto& [pid, start, end] : scheduler->ganttChart()) {
-        if (pid == -1)
-            out_ << "[IDLE:" << start << "-" << end << "] ";
-        else if (pid == -2)
-            out_ << "[CS:" << start << "-" << end << "] ";
-        else
-            out_ << "[P" << pid << ":" << start << "-" << end << "] ";
-    }
-    out_ << "\n";
+    // Gantt chart visualization
+    GanttChart::render(scheduler->ganttChart(), out_, 80, colorsEnabled_);
 
     auto metrics = SchedulingMetrics::compute(procs, scheduler->ganttChart());
     metrics.print(out_);
