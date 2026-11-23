@@ -40,3 +40,6 @@ Makefile
 *.pem
 *.key
 *.env
+
+# Temporary test outputs
+test_*.csv
