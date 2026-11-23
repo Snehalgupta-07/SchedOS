@@ -5,35 +5,33 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Tests](https://img.shields.io/badge/Tests-269%20passed-success.svg)](#testing-and-verification)
 
-**SchedOS** is a high-performance, modular operating system process scheduling engine, concurrency benchmarking framework, and interactive simulation platform engineered in modern C++17. Designed with strict clean-code principles, object-oriented abstractions, and industry-standard operating system scheduling algorithms, SchedOS models CPU scheduling dynamics, preemptions, CPU idle periods, configurable context-switching overhead, and system performance metrics with mathematical precision.
+**SchedOS** is a modular operating system CPU scheduling simulator and multicore benchmarking framework written in modern C++17. It models uniprocessor CPU scheduling dynamics, preemptive context switching, idle intervals, and scheduling performance metrics with zero external dependencies.
 
-Beyond mathematical scheduling simulation, SchedOS incorporates an enterprise-grade **native C++ multithreading and concurrency subsystem** featuring a thread-safe task queue, a reusable RAII-compliant worker thread pool, and a high-precision performance benchmarking engine that measures parallel speedup and throughput under real CPU-bound workloads.
-
-Developed as a core systems-programming portfolio project targeting high-reliability software engineering roles (such as Siemens Software Engineer / Graduate Engineer Trainee).
+In addition to discrete-event scheduling simulation, SchedOS includes a native multithreading module featuring a thread-safe task queue and a reusable worker thread pool to benchmark multicore speedup and throughput on real CPU-bound workloads.
 
 ---
 
 ## Problem Statement
 
-Operating system kernels must arbitrate access to physical processor cores among competing processes while balancing throughput, latency, responsiveness, and fairness. Understanding and optimizing CPU scheduling requires modeling complex trade-offs:
+Operating system kernels must arbitrate access to physical processor cores among competing processes while balancing throughput, latency, responsiveness, and fairness. Understanding and optimizing CPU scheduling requires analyzing key trade-offs:
 - Preemptive vs. non-preemptive dispatching
-- Context-switch overhead and cache-invalidation penalties
+- Context-switch overhead and scheduling latency
 - Starvation hazards in priority systems
-- Real-world multicore scaling limits governed by Amdahl's Law
+- Multicore scaling limits governed by Amdahl's Law
 
-SchedOS addresses these challenges by providing both a rigorous deterministic simulation environment for scheduling algorithms and an actual native multithreading framework to measure real host concurrency.
+SchedOS models these dynamics through deterministic simulation while providing a native multithreading framework to measure real host concurrency.
 
 ---
 
 ## Technology Stack
 
-SchedOS utilizes standard C++17 and standard development tooling with **zero external dependencies**:
+SchedOS is implemented in standard C++17 with **zero external dependencies**:
 
 - **Language Standard**: C++17 (`std::unique_ptr`, `std::optional`, `std::string_view`, structured bindings, `std::tuple`)
 - **Standard Template Library (STL)**: `<vector>`, `<queue>`, `<memory>`, `<algorithm>`, `<numeric>`, `<chrono>`
 - **Concurrency & Synchronization**: `<thread>`, `<mutex>`, `<condition_variable>`, `<atomic>`, `<future>`
 - **Build System**: CMake 3.14+ (Cross-platform, strict warning flags `-Wall -Wextra -Wpedantic` / `/W4`, static linking)
-- **Testing**: Lightweight native C++ assertion framework and CTest integration (269 automated assertions)
+- **Testing**: Lightweight native C++ assertion test suite and CTest integration (269 automated assertions)
 
 ---
 
@@ -98,12 +96,12 @@ flowchart TD
 
 ### 5. Multithreading & Concurrency
 - **Thread-Safe Queue**: Condition variable wakeups, non-blocking polling (`tryPop`), blocking waits (`pop`), and thread-safe shutdown.
-- **Industrial Thread Pool**: Configurable worker count, task tracking via `std::atomic<size_t>`, exception propagation across threads, and clean RAII teardown.
+- **Worker Thread Pool**: Configurable worker count, lock-free task tracking via `std::atomic<size_t>`, exception propagation across threads, and clean RAII teardown.
 - **Simulation vs. Host Execution Separation**: Clear boundaries between mathematical scheduling models and host OS worker threads.
 
 ### 6. Testing & Benchmarking
 - **Comprehensive Harness**: 269 automated assertions across 19 suites.
-- **Independent Verification**: Rigorous hand-calculated test cases verifying boundary conditions, preemption, idle gaps, and aging.
+- **Independent Verification**: Hand-calculated test cases verifying boundary conditions, preemption, idle gaps, and priority aging.
 - **Scale Stress Testing**: Validated on batches of 100, 1,000, and 10,000 processes without memory leaks or performance degradation.
 
 ---
@@ -169,7 +167,7 @@ The `BenchmarkEngine` executes compute-heavy workloads across multiple worker th
 
 ## Terminal Screenshots & Execution Previews
 
-Genuine captured terminal sessions are cataloged in [`docs/screenshots/`](docs/screenshots/README.md):
+Captured terminal sessions are cataloged in [`docs/screenshots/`](docs/screenshots/README.md):
 
 1. **[Interactive Main Menu](docs/screenshots/01_main_menu.txt)**: Full 12-option terminal interface.
 2. **[Process Table Management](docs/screenshots/02_process_management.txt)**: Tabular process displays with PID and arrival information.
@@ -274,21 +272,12 @@ ctest --output-on-failure
 ```
 
 ### Compiler Sanitizers Status
-- **AddressSanitizer / UndefinedBehaviorSanitizer / ThreadSanitizer**: On Windows MinGW-w64 distributions, sanitizer runtimes (`libasan`, `libubsan`, `libtsan`) are typically not packaged by the MinGW toolchain. The codebase was written to be fully compliant and compiles cleanly under `-Wall -Wextra -Wpedantic` with zero warnings. Sanitizers can be enabled on Linux/macOS environments via `-fsanitize=address,undefined`.
+- **AddressSanitizer / UndefinedBehaviorSanitizer / ThreadSanitizer**: On Windows MinGW-w64 distributions, sanitizer runtimes (`libasan`, `libubsan`, `libtsan`) are typically not packaged by default. The codebase adheres strictly to C++17 RAII memory safety and compiles cleanly under `-Wall -Wextra -Wpedantic` with zero warnings. On Linux/macOS environments, sanitizers can be enabled via `-fsanitize=address,undefined`.
 
 ---
 
 ## Architectural Limitations
 
-1. **Deterministic Simulation Scope**: The CPU scheduling algorithms (FCFS, SJF, SRTF, RR, Priority) are mathematical simulations designed for uniprocessor educational analysis. They do not replace or modify the host operating system's kernel scheduler.
+1. **Deterministic Simulation Scope**: The CPU scheduling algorithms (FCFS, SJF, SRTF, RR, Priority) are discrete mathematical simulations designed for uniprocessor educational analysis. They do not replace or modify the host operating system's kernel scheduler.
 2. **Separation of Concerns**: Simulated processes do not map directly to host OS threads; the `ThreadPool` executes actual native tasks independently for concurrency benchmarking.
 3. **Hardware Dependence**: Benchmarked speedup and throughput depend directly on host core count, CPU architecture, memory bandwidth, and background OS activity. Multithreading will not always show linear speedup for trivial workloads due to thread management overhead.
-
----
-
-## Project Status
-
-- [x] **Phase 1: Core C++ Scheduling Engine** (5 algorithms, core metrics, CMake setup, 69 tests)
-- [x] **Phase 2: Advanced Scheduling, Visualization & Interactive CLI** (Gantt chart, context switching, comparison engine, CSV I/O, 148 tests)
-- [x] **Phase 3: Multithreading, Concurrency & Performance Benchmarking** (Thread-safe task queue, thread pool, benchmark engine, priority aging, fairness metrics, 203 tests)
-- [x] **Phase 4: Final Verification, Documentation & GitHub Release** (Independent algorithm verification, regression tests, zero compiler warnings, terminal screenshots, 269 tests, professional documentation)
