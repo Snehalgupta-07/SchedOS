@@ -14,6 +14,8 @@
 #include "schedos/Metrics.h"
 #include "schedos/CLI.h"
 #include "schedos/GanttChart.h"
+#include "schedos/CSVManager.h"
+#include "schedos/ComparisonEngine.h"
 
 using namespace SchedOS;
 
@@ -93,12 +95,21 @@ int main(int argc, char* argv[]) {
 
     std::vector<Process> processes;
     if (!inputFile.empty()) {
-        std::ifstream fin(inputFile);
-        if (!fin.is_open()) {
-            std::cerr << "Error: cannot open file '" << inputFile << "'\n";
-            return 1;
+        if (inputFile.length() >= 4 && inputFile.substr(inputFile.length() - 4) == ".csv") {
+            try {
+                processes = CSVManager::importProcesses(inputFile);
+            } catch (const std::exception& e) {
+                std::cerr << "Error loading CSV: " << e.what() << "\n";
+                return 1;
+            }
+        } else {
+            std::ifstream fin(inputFile);
+            if (!fin.is_open()) {
+                std::cerr << "Error: cannot open file '" << inputFile << "'\n";
+                return 1;
+            }
+            processes = readProcesses(fin);
         }
-        processes = readProcesses(fin);
     } else {
         std::cout << "Enter processes (PID ArrivalTime BurstTime Priority), one per line.\n";
         std::cout << "Press Ctrl+Z (Windows) or Ctrl+D (Unix) to finish:\n\n";
@@ -139,6 +150,12 @@ int main(int argc, char* argv[]) {
             std::cerr << "Available: fcfs, sjf, srtf, rr, priority, all\n";
         }
     };
+
+    if (algorithm == "compare") {
+        auto results = ComparisonEngine::compareAll(processes, quantum, csCost);
+        ComparisonEngine::printComparisonTable(results, std::cout, true);
+        return 0;
+    }
 
     run(algorithm);
 

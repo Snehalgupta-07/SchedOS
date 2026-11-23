@@ -89,7 +89,7 @@ void ComparisonEngine::printComparisonTable(const std::vector<ComparisonResult>&
     out << "====================================================================================================\n" << reset;
 
     out << std::left
-        << std::setw(32) << "Algorithm"
+        << std::setw(38) << "Algorithm"
         << std::setw(10) << "Avg WT"
         << std::setw(10) << "Avg TAT"
         << std::setw(10) << "Avg RT"
@@ -98,7 +98,7 @@ void ComparisonEngine::printComparisonTable(const std::vector<ComparisonResult>&
         << std::setw(10) << "CS Count"
         << std::setw(10) << "Total Time"
         << "\n";
-    out << std::string(100, '-') << "\n";
+    out << std::string(106, '-') << "\n";
 
     for (const auto& r : results) {
         bool bestWT  = std::abs(r.metrics.avgWaitingTime - minAvgWT) < 0.001;
@@ -109,7 +109,7 @@ void ComparisonEngine::printComparisonTable(const std::vector<ComparisonResult>&
         bool bestCS  = (r.contextSwitchCount == minCS);
         bool bestTime = (r.totalExecutionTime == minTotalTime);
 
-        out << std::left << std::setw(32) << r.algorithmName;
+        out << std::left << std::setw(38) << r.algorithmName;
 
         // Avg WT
         if (bestWT) out << green << std::setw(10) << (std::to_string(r.metrics.avgWaitingTime).substr(0, 5) + "*") << reset;
